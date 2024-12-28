@@ -124,14 +124,21 @@ fn test_join_pool() {
         pic.tick();
     }
 
-    assert_eq!(get_remaining_pool_cycles(&pic, admin), None);
-    assert!(join_pool(&pic, admin, 10_000_000)
-        .unwrap_err()
-        .contains("amount too low"));
-    assert_eq!(get_remaining_pool_cycles(&pic, admin), None);
-    join_pool(&pic, admin, 100_000_000).unwrap();
-    assert_eq!(
-        get_remaining_pool_cycles(&pic, admin),
-        Some(7_800_000_000_000)
-    );
+    for user in [admin, user_1, user_2] {
+        assert_eq!(get_remaining_pool_cycles(&pic, user), None);
+        assert!(join_pool(&pic, user, 10_000_000)
+            .unwrap_err()
+            .contains("amount too low"));
+        assert_eq!(get_remaining_pool_cycles(&pic, user), None);
+        join_pool(&pic, user, 100_000_000).unwrap();
+        assert_eq!(
+            get_remaining_pool_cycles(&pic, user),
+            Some(7_800_000_000_000)
+        );
+        join_pool(&pic, user, 100_000_000).unwrap();
+        assert_eq!(
+            get_remaining_pool_cycles(&pic, user),
+            Some(7_800_000_000_000 * 2)
+        );
+    }
 }

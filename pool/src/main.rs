@@ -13,18 +13,6 @@ use std::time::Duration;
 
 fn main() {}
 
-async fn spawn_miner(block_index: u64) -> Principal {
-    ic_cdk::call::<_, (Result<Principal, String>,)>(
-        MAINNET_BOB_CANISTER_ID,
-        "spawn_miner",
-        (block_index,),
-    )
-    .await
-    .unwrap()
-    .0
-    .unwrap()
-}
-
 async fn transfer_topup_bob(amount: u64) -> u64 {
     let sub = Subaccount::from(&ic_types::PrincipalId(MAINNET_BOB_CANISTER_ID));
     let to = AccountIdentifier::new(
@@ -70,6 +58,18 @@ async fn transfer_topup_bob(amount: u64) -> u64 {
         }
     }
     block_index
+}
+
+async fn spawn_miner(block_index: u64) -> Principal {
+    ic_cdk::call::<_, (Result<Principal, String>,)>(
+        MAINNET_BOB_CANISTER_ID,
+        "spawn_miner",
+        (block_index,),
+    )
+    .await
+    .unwrap()
+    .0
+    .unwrap()
 }
 
 #[init]
