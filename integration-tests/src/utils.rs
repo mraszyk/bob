@@ -187,7 +187,7 @@ pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<u6
         pic,
         BOB_POOL_CANISTER_ID,
         user_id,
-        "get_remaining_cycles",
+        "get_member_cycles",
         ((),),
     )
     .unwrap()

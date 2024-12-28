@@ -1,7 +1,5 @@
 use bob_pool::guard::GuardPrincipal;
-use bob_pool::memory::{
-    add_member_cycles, get_member_cycles, get_miner_canister, set_miner_canister,
-};
+use bob_pool::memory::{add_member_cycles, get_miner_canister, set_miner_canister};
 use bob_pool::{
     fetch_block, notify_top_up, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
     MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
@@ -94,9 +92,9 @@ fn is_ready() -> bool {
 }
 
 #[query]
-fn get_remaining_cycles() -> Option<Nat> {
+fn get_member_cycles() -> Option<Nat> {
     assert!(is_ready());
-    get_member_cycles(ic_cdk::caller()).map(|cycles| cycles.into())
+    bob_pool::memory::get_member_cycles(ic_cdk::caller()).map(|cycles| cycles.into())
 }
 
 #[update]

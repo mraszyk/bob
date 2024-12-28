@@ -105,16 +105,3 @@ where
 {
     __STATE.with(|s| f(&mut s.borrow_mut()))
 }
-
-pub fn read_state<F, R>(f: F) -> R
-where
-    F: FnOnce(&State) -> R,
-{
-    __STATE.with(|s| f(&s.borrow()))
-}
-
-pub fn replace_state(state: State) {
-    __STATE.with(|s| {
-        *s.borrow_mut() = state;
-    });
-}

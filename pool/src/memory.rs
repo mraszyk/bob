@@ -30,7 +30,7 @@ where
 
 // NOTE: ensure that all memory ids are unique and
 // do not change across upgrades!
-const BOB_MINER_CANISTER_MEM_ID: MemoryId = MemoryId::new(0);
+const MINER_CANISTER_MEM_ID: MemoryId = MemoryId::new(0);
 const MEMBER_TO_CYCLES_MEM_ID: MemoryId = MemoryId::new(1);
 
 type VM = VirtualMemory<DefMem>;
@@ -40,23 +40,23 @@ thread_local! {
         MM::init(DefaultMemoryImpl::default())
     );
 
-    static BOB_MINER_CANISTER: RefCell<StableCell<Option<Principal>, VM>> =
+    static MINER_CANISTER: RefCell<StableCell<Option<Principal>, VM>> =
         MEMORY_MANAGER.with(|mm| {
-        RefCell::new(StableCell::init(mm.borrow().get(BOB_MINER_CANISTER_MEM_ID), None).unwrap())
-        });
+        RefCell::new(StableCell::init(mm.borrow().get(MINER_CANISTER_MEM_ID), None).unwrap())
+    });
 
     static MEMBER_TO_CYCLES: RefCell<StableBTreeMap<Principal, u128, VM>> =
         MEMORY_MANAGER.with(|mm| {
         RefCell::new(StableBTreeMap::init(mm.borrow().get(MEMBER_TO_CYCLES_MEM_ID)))
-        });
+    });
 }
 
 pub fn get_miner_canister() -> Option<Principal> {
-    BOB_MINER_CANISTER.with(|s| *s.borrow().get())
+    MINER_CANISTER.with(|s| *s.borrow().get())
 }
 
 pub fn set_miner_canister(bob_miner_canister: Principal) {
-    let _ = BOB_MINER_CANISTER.with(|s| s.borrow_mut().set(Some(bob_miner_canister)).unwrap());
+    let _ = MINER_CANISTER.with(|s| s.borrow_mut().set(Some(bob_miner_canister)).unwrap());
 }
 
 pub fn add_member_cycles(member: Principal, new_cycles: u128) {

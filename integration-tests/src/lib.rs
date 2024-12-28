@@ -90,14 +90,14 @@ fn test_pool_not_ready() {
         &pic,
         BOB_POOL_CANISTER_ID,
         admin,
-        "get_remaining_cycles",
+        "get_member_cycles",
         ((),),
     )
     .unwrap_err();
     assert_pool_not_ready_error(err);
 
     let block_index = transfer_topup_pool(&pic, admin, 100_000_000);
-    let err = update_candid_as::<_, (Option<Nat>,)>(
+    let err = update_candid_as::<_, (Result<(), String>,)>(
         &pic,
         BOB_POOL_CANISTER_ID,
         admin,
