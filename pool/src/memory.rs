@@ -1,4 +1,5 @@
-use candid::Principal;
+use crate::MemberCycles;
+use candid::{Nat, Principal};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::DefaultMemoryImpl;
@@ -45,7 +46,7 @@ thread_local! {
         RefCell::new(StableCell::init(mm.borrow().get(MINER_CANISTER_MEM_ID), None).unwrap())
     });
 
-    static MEMBER_TO_CYCLES: RefCell<StableBTreeMap<Principal, u128, VM>> =
+    static MEMBER_TO_CYCLES: RefCell<StableBTreeMap<Principal, Cbor<MemberCycles>, VM>> =
         MEMORY_MANAGER.with(|mm| {
         RefCell::new(StableBTreeMap::init(mm.borrow().get(MEMBER_TO_CYCLES_MEM_ID)))
     });
@@ -61,11 +62,20 @@ pub fn set_miner_canister(bob_miner_canister: Principal) {
 
 pub fn add_member_cycles(member: Principal, new_cycles: u128) {
     MEMBER_TO_CYCLES.with(|s| {
-        let current_cycles = s.borrow().get(&member).unwrap_or(0);
-        s.borrow_mut().insert(member, current_cycles + new_cycles)
+        let mut member_cycles = s.borrow().get(&member).unwrap_or_default();
+        member_cycles.0.total += new_cycles;
+        s.borrow_mut().insert(member, member_cycles)
     });
 }
 
-pub fn get_member_cycles(member: Principal) -> Option<u128> {
-    MEMBER_TO_CYCLES.with(|s| s.borrow().get(&member))
+pub fn set_member_block_cycles(member: Principal, block_cycles: Nat) {
+    MEMBER_TO_CYCLES.with(|s| {
+        let mut member_cycles = s.borrow().get(&member).unwrap_or_default();
+        member_cycles.0.block += block_cycles;
+        s.borrow_mut().insert(member, member_cycles)
+    });
+}
+
+pub fn get_member_cycles(member: Principal) -> Option<MemberCycles> {
+    MEMBER_TO_CYCLES.with(|s| s.borrow().get(&member).map(|mc| mc.0))
 }

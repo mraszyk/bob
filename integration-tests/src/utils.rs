@@ -3,6 +3,7 @@ use crate::{
     NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
 };
 use bob_minter_v2::Stats;
+use bob_pool::MemberCycles;
 use candid::{Nat, Principal};
 use ic_ledger_core::block::BlockType;
 use ic_ledger_types::{
@@ -182,8 +183,8 @@ pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
     .unwrap()
 }
 
-pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<u64> {
-    update_candid_as::<_, (Option<Nat>,)>(
+pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<MemberCycles> {
+    update_candid_as::<_, (Option<MemberCycles>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         user_id,
@@ -192,7 +193,23 @@ pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<u6
     )
     .unwrap()
     .0
-    .map(|cycles| cycles.0.try_into().unwrap())
+}
+
+pub(crate) fn set_member_block_cycles(
+    pic: &PocketIc,
+    user_id: Principal,
+    block_cycles: u128,
+) -> Result<(), String> {
+    let block_cycles_nat: Nat = block_cycles.into();
+    update_candid_as::<_, (Result<(), String>,)>(
+        pic,
+        BOB_POOL_CANISTER_ID,
+        user_id,
+        "set_member_block_cycles",
+        ((block_cycles_nat),),
+    )
+    .unwrap()
+    .0
 }
 
 pub(crate) fn get_miner(pic: &PocketIc) -> Option<Principal> {

@@ -6,9 +6,10 @@ mod utils;
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
     bob_balance, get_member_cycles, get_miner, is_pool_ready, join_native_pool, join_pool,
-    mine_block, spawn_miner, transfer_to_principal, transfer_topup_pool,
+    mine_block, set_member_block_cycles, spawn_miner, transfer_to_principal, transfer_topup_pool,
 };
-use candid::{Nat, Principal};
+use bob_pool::MemberCycles;
+use candid::Principal;
 use pocket_ic::{update_candid_as, CallError};
 
 // System canister IDs
@@ -86,7 +87,7 @@ fn test_pool_not_ready() {
     deploy_pool(&pic, admin);
     assert!(!is_pool_ready(&pic));
 
-    let err = update_candid_as::<_, (Option<Nat>,)>(
+    let err = update_candid_as::<_, (Option<MemberCycles>,)>(
         &pic,
         BOB_POOL_CANISTER_ID,
         admin,
@@ -119,15 +120,19 @@ fn test_join_pool() {
     deploy_ready_pool(&pic, admin);
 
     for user in [admin, user_1, user_2] {
-        assert_eq!(get_member_cycles(&pic, user), None);
+        assert!(get_member_cycles(&pic, user).is_none());
         assert!(join_pool(&pic, user, 10_000_000)
             .unwrap_err()
             .contains("amount too low"));
-        assert_eq!(get_member_cycles(&pic, user), None);
+        assert!(get_member_cycles(&pic, user).is_none());
         join_pool(&pic, user, 100_000_000).unwrap();
-        assert_eq!(get_member_cycles(&pic, user), Some(7_800_000_000_000));
+        let member_cycles = get_member_cycles(&pic, user).unwrap();
+        assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
+        assert_eq!(member_cycles.block, 0_u64);
         join_pool(&pic, user, 100_000_000).unwrap();
-        assert_eq!(get_member_cycles(&pic, user), Some(7_800_000_000_000 * 2));
+        let member_cycles = get_member_cycles(&pic, user).unwrap();
+        assert_eq!(member_cycles.total, 2 * 7_800_000_000_000_u64);
+        assert_eq!(member_cycles.block, 0_u64);
     }
 }
 
@@ -141,10 +146,31 @@ fn test_upgrade_pool() {
     let bob_miner = get_miner(&pic).unwrap();
 
     join_pool(&pic, admin, 100_000_000).unwrap();
-    assert_eq!(get_member_cycles(&pic, admin), Some(7_800_000_000_000));
+    set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap();
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
+    assert_eq!(member_cycles.block, 100_000_000_000_u64);
 
     upgrade_pool(&pic, admin);
     assert!(is_pool_ready(&pic));
     assert_eq!(get_miner(&pic).unwrap(), bob_miner);
-    assert_eq!(get_member_cycles(&pic, admin), Some(7_800_000_000_000));
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
+    assert_eq!(member_cycles.block, 100_000_000_000_u64);
+}
+
+#[test]
+fn test_set_member_block_cycles() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let pic = setup(vec![admin]);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    let err = set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap_err();
+    assert!(err.contains(&format!("The caller {} is no pool member.", admin)));
+
+    join_pool(&pic, admin, 100_000_000).unwrap();
+
+    set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap();
 }

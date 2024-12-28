@@ -2,6 +2,7 @@ use candid::{CandidType, Decode, Encode, Nat, Principal};
 use cycles_minting_canister::NotifyError;
 use ic_ledger_core::block::BlockType;
 use ic_types::Cycles;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
@@ -22,6 +23,12 @@ pub const MAINNET_CYCLE_MINTER_CANISTER_ID: Principal =
 
 pub mod guard;
 pub mod memory;
+
+#[derive(CandidType, Debug, Default, Serialize, Deserialize)]
+pub struct MemberCycles {
+    pub total: Nat,
+    pub block: Nat,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskType {

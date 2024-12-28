@@ -2360,6 +2360,7 @@ name = "integration-tests"
 version = "0.0.1"
 dependencies = [
  "bob-minter-v2",
+ "bob-pool",
  "candid",
  "candid_parser",
  "hex",

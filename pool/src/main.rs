@@ -1,8 +1,8 @@
 use bob_pool::guard::GuardPrincipal;
 use bob_pool::memory::{add_member_cycles, get_miner_canister, set_miner_canister};
 use bob_pool::{
-    fetch_block, notify_top_up, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
-    MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
+    fetch_block, notify_top_up, MemberCycles, MAINNET_BOB_CANISTER_ID,
+    MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
 };
 use candid::{Nat, Principal};
 use ic_cdk::{init, query, update};
@@ -92,9 +92,20 @@ fn is_ready() -> bool {
 }
 
 #[query]
-fn get_member_cycles() -> Option<Nat> {
+fn get_member_cycles() -> Option<MemberCycles> {
     assert!(is_ready());
-    bob_pool::memory::get_member_cycles(ic_cdk::caller()).map(|cycles| cycles.into())
+    bob_pool::memory::get_member_cycles(ic_cdk::caller())
+}
+
+#[update]
+fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
+    assert!(is_ready());
+    let caller = ic_cdk::caller();
+    if bob_pool::memory::get_member_cycles(caller).is_none() {
+        return Err(format!("The caller {} is no pool member.", caller));
+    }
+    bob_pool::memory::set_member_block_cycles(caller, block_cycles);
+    Ok(())
 }
 
 #[update]
