@@ -60,7 +60,7 @@ pub fn set_miner_canister(bob_miner_canister: Principal) {
     let _ = MINER_CANISTER.with(|s| s.borrow_mut().set(Some(bob_miner_canister)).unwrap());
 }
 
-pub fn add_member_cycles(member: Principal, new_cycles: u128) {
+pub fn add_member_total_cycles(member: Principal, new_cycles: u128) {
     MEMBER_TO_CYCLES.with(|s| {
         let mut member_cycles = s.borrow().get(&member).unwrap_or_default();
         member_cycles.0.total += new_cycles;

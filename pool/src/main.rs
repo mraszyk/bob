@@ -1,5 +1,5 @@
 use bob_pool::guard::GuardPrincipal;
-use bob_pool::memory::{add_member_cycles, get_miner_canister, set_miner_canister};
+use bob_pool::memory::{add_member_total_cycles, get_miner_canister, set_miner_canister};
 use bob_pool::{
     fetch_block, notify_top_up, MemberCycles, MAINNET_BOB_CANISTER_ID,
     MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
@@ -146,7 +146,7 @@ async fn join_pool(block_index: u64) -> Result<(), String> {
         );
 
         let res = notify_top_up(block_index).await?;
-        add_member_cycles(caller, res.get());
+        add_member_total_cycles(caller, res.get());
 
         Ok(())
     } else {
