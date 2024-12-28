@@ -1,6 +1,6 @@
 use bob_pool::guard::GuardPrincipal;
 use bob_pool::memory::{
-    get_miner_canister, get_miner_cycles, insert_new_miner, set_bob_miner_canister,
+    add_member_cycles, get_member_cycles, get_miner_canister, set_miner_canister,
 };
 use bob_pool::{
     fetch_block, notify_top_up, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
@@ -79,7 +79,7 @@ fn init() {
         ic_cdk::spawn(async move {
             let block_index = transfer_topup_bob(100_000_000).await;
             let bob_miner_id = spawn_miner(block_index).await;
-            set_bob_miner_canister(bob_miner_id);
+            set_miner_canister(bob_miner_id);
         })
     });
 }
@@ -96,7 +96,7 @@ fn is_ready() -> bool {
 #[query]
 fn get_remaining_cycles() -> Option<Nat> {
     assert!(is_ready());
-    get_miner_cycles(ic_cdk::caller()).map(|cycles| cycles.into())
+    get_member_cycles(ic_cdk::caller()).map(|cycles| cycles.into())
 }
 
 #[update]
@@ -137,8 +137,7 @@ async fn join_pool(block_index: u64) -> Result<(), String> {
         );
 
         let res = notify_top_up(block_index).await?;
-        let current_cycles = get_miner_cycles(caller).unwrap_or(0);
-        insert_new_miner(caller, current_cycles + res.get());
+        add_member_cycles(caller, res.get());
 
         Ok(())
     } else {

@@ -5,7 +5,7 @@ mod utils;
 
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
-    bob_balance, get_miner, get_remaining_pool_cycles, is_pool_ready, join_native_pool, join_pool,
+    bob_balance, get_member_cycles, get_miner, is_pool_ready, join_native_pool, join_pool,
     mine_block, spawn_miner, transfer_to_principal, transfer_topup_pool,
 };
 use candid::{Nat, Principal};
@@ -119,21 +119,15 @@ fn test_join_pool() {
     deploy_ready_pool(&pic, admin);
 
     for user in [admin, user_1, user_2] {
-        assert_eq!(get_remaining_pool_cycles(&pic, user), None);
+        assert_eq!(get_member_cycles(&pic, user), None);
         assert!(join_pool(&pic, user, 10_000_000)
             .unwrap_err()
             .contains("amount too low"));
-        assert_eq!(get_remaining_pool_cycles(&pic, user), None);
+        assert_eq!(get_member_cycles(&pic, user), None);
         join_pool(&pic, user, 100_000_000).unwrap();
-        assert_eq!(
-            get_remaining_pool_cycles(&pic, user),
-            Some(7_800_000_000_000)
-        );
+        assert_eq!(get_member_cycles(&pic, user), Some(7_800_000_000_000));
         join_pool(&pic, user, 100_000_000).unwrap();
-        assert_eq!(
-            get_remaining_pool_cycles(&pic, user),
-            Some(7_800_000_000_000 * 2)
-        );
+        assert_eq!(get_member_cycles(&pic, user), Some(7_800_000_000_000 * 2));
     }
 }
 
@@ -147,16 +141,10 @@ fn test_upgrade_pool() {
     let bob_miner = get_miner(&pic).unwrap();
 
     join_pool(&pic, admin, 100_000_000).unwrap();
-    assert_eq!(
-        get_remaining_pool_cycles(&pic, admin),
-        Some(7_800_000_000_000)
-    );
+    assert_eq!(get_member_cycles(&pic, admin), Some(7_800_000_000_000));
 
     upgrade_pool(&pic, admin);
     assert!(is_pool_ready(&pic));
     assert_eq!(get_miner(&pic).unwrap(), bob_miner);
-    assert_eq!(
-        get_remaining_pool_cycles(&pic, admin),
-        Some(7_800_000_000_000)
-    );
+    assert_eq!(get_member_cycles(&pic, admin), Some(7_800_000_000_000));
 }

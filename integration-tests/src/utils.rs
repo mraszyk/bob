@@ -182,7 +182,7 @@ pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
     .unwrap()
 }
 
-pub(crate) fn get_remaining_pool_cycles(pic: &PocketIc, user_id: Principal) -> Option<u64> {
+pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<u64> {
     update_candid_as::<_, (Option<Nat>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
