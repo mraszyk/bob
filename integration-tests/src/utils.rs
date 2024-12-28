@@ -1,12 +1,15 @@
 use crate::{
-    BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
+    BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID, NNS_CYCLES_MINTING_CANISTER_ID,
+    NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
 };
 use bob_minter_v2::Stats;
 use candid::{Nat, Principal};
 use ic_ledger_core::block::BlockType;
-use ic_ledger_types::{AccountIdentifier, Memo, Tokens, TransferArgs, TransferResult};
+use ic_ledger_types::{
+    AccountIdentifier, Memo, Subaccount, Tokens, TransferArgs, TransferResult, DEFAULT_SUBACCOUNT,
+};
 use icrc_ledger_types::icrc1::account::Account;
-use pocket_ic::{update_candid_as, PocketIc};
+use pocket_ic::{update_candid_as, CallError, PocketIc};
 
 pub(crate) fn get_icp_block(pic: &PocketIc, block_index: u64) -> Option<icp_ledger::Block> {
     let get_blocks_args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {
@@ -28,16 +31,39 @@ pub(crate) fn get_icp_block(pic: &PocketIc, block_index: u64) -> Option<icp_ledg
         .map(|block_raw| icp_ledger::Block::decode(block_raw.clone()).unwrap())
 }
 
-pub(crate) fn transfer(pic: &PocketIc, user_id: Principal, amount: u64) -> u64 {
+pub(crate) fn transfer_topup_bob(pic: &PocketIc, user_id: Principal, amount: u64) -> u64 {
+    let sub = Subaccount::from(BOB_CANISTER_ID);
+    let to = AccountIdentifier::new(&NNS_CYCLES_MINTING_CANISTER_ID, &sub);
+    transfer(pic, user_id, to, amount)
+}
+
+pub(crate) fn transfer_topup_pool(pic: &PocketIc, user_id: Principal, amount: u64) -> u64 {
+    let sub = Subaccount::from(BOB_POOL_CANISTER_ID);
+    let to = AccountIdentifier::new(&NNS_CYCLES_MINTING_CANISTER_ID, &sub);
+    transfer(pic, user_id, to, amount)
+}
+
+pub(crate) fn transfer_to_principal(
+    pic: &PocketIc,
+    user_id: Principal,
+    beneficiary: Principal,
+    amount: u64,
+) -> u64 {
+    transfer(
+        pic,
+        user_id,
+        AccountIdentifier::new(&beneficiary, &DEFAULT_SUBACCOUNT),
+        amount,
+    )
+}
+
+fn transfer(pic: &PocketIc, user_id: Principal, to: AccountIdentifier, amount: u64) -> u64 {
     let transfer_args = TransferArgs {
         memo: Memo(1347768404),
         amount: Tokens::from_e8s(amount),
         from_subaccount: None,
         fee: Tokens::from_e8s(10_000),
-        to: AccountIdentifier::from_hex(
-            "e7b583c3e3e2837c987831a97a6b980cbb0be89819e85915beb3c02006923fce",
-        )
-        .unwrap(),
+        to,
         created_at_time: None,
     };
     let block_index = update_candid_as::<_, (TransferResult,)>(
@@ -61,7 +87,7 @@ pub(crate) fn transfer(pic: &PocketIc, user_id: Principal, amount: u64) -> u64 {
 }
 
 pub(crate) fn spawn_miner(pic: &PocketIc, user_id: Principal, amount: u64) -> Principal {
-    let block_index = transfer(pic, user_id, amount);
+    let block_index = transfer_topup_bob(pic, user_id, amount);
 
     update_candid_as::<_, (Result<Principal, String>,)>(
         pic,
@@ -75,19 +101,38 @@ pub(crate) fn spawn_miner(pic: &PocketIc, user_id: Principal, amount: u64) -> Pr
     .unwrap()
 }
 
-pub(crate) fn join_native_pool(pic: &PocketIc, user_id: Principal, amount: u64) {
-    let block_index = transfer(pic, user_id, amount);
+pub(crate) fn join_native_pool(
+    pic: &PocketIc,
+    user_id: Principal,
+    amount: u64,
+) -> Result<(), String> {
+    let block_index = transfer_topup_bob(pic, user_id, amount);
+    join_pool_(pic, user_id, BOB_CANISTER_ID, block_index)
+}
 
+pub(crate) fn join_pool(pic: &PocketIc, user_id: Principal, amount: u64) -> Result<(), String> {
+    let block_index = transfer_topup_pool(pic, user_id, amount);
+    join_pool_(pic, user_id, BOB_POOL_CANISTER_ID, block_index)
+}
+
+fn join_pool_(
+    pic: &PocketIc,
+    user_id: Principal,
+    canister_id: Principal,
+    block_index: u64,
+) -> Result<(), String> {
     update_candid_as::<_, (Result<(), String>,)>(
         pic,
-        BOB_CANISTER_ID,
+        canister_id,
         user_id,
         "join_pool",
         (block_index,),
     )
-    .unwrap()
-    .0
-    .unwrap()
+    .map(|res| res.0.unwrap())
+    .map_err(|err| match err {
+        CallError::UserError(user_error) => user_error.description,
+        CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
+    })
 }
 
 pub(crate) fn get_stats(pic: &PocketIc) -> Stats {
@@ -135,4 +180,29 @@ pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
      .0
     .try_into()
     .unwrap()
+}
+
+pub(crate) fn get_remaining_pool_cycles(pic: &PocketIc, user_id: Principal) -> Option<u64> {
+    update_candid_as::<_, (Option<Nat>,)>(
+        pic,
+        BOB_POOL_CANISTER_ID,
+        user_id,
+        "get_remaining_cycles",
+        ((),),
+    )
+    .unwrap()
+    .0
+    .map(|cycles| cycles.0.try_into().unwrap())
+}
+
+pub(crate) fn is_pool_ready(pic: &PocketIc) -> bool {
+    update_candid_as::<_, (bool,)>(
+        pic,
+        BOB_POOL_CANISTER_ID,
+        Principal::anonymous(),
+        "is_ready",
+        ((),),
+    )
+    .unwrap()
+    .0
 }

@@ -4,6 +4,7 @@ members = [
   "miner-v2",
   "minter-v2",
   "integration-tests",
+  "pool",
 ]
 
 [workspace.package]

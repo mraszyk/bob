@@ -1,5 +1,5 @@
 use crate::{
-    BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, NNS_CYCLES_MINTING_CANISTER_ID,
+    BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID, NNS_CYCLES_MINTING_CANISTER_ID,
     NNS_GOVERNANCE_CANISTER_ID, NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
     NNS_ROOT_CANISTER_ID,
 };
@@ -232,4 +232,19 @@ pub(crate) fn setup(icp_holders: Vec<Principal>) -> PocketIc {
     deploy_bob_canisters(&pic);
 
     pic
+}
+
+pub(crate) fn deploy_pool(pic: &PocketIc, admin: Principal) {
+    let bob_pool_canister_id = pic
+        .create_canister_with_id(Some(admin), None, BOB_POOL_CANISTER_ID)
+        .unwrap();
+    assert_eq!(bob_pool_canister_id, BOB_POOL_CANISTER_ID);
+    pic.add_cycles(bob_pool_canister_id, 100_000_000_000_000);
+    let bob_pool_canister_wasm = get_canister_wasm("bob-pool").to_vec();
+    pic.install_canister(
+        bob_pool_canister_id,
+        bob_pool_canister_wasm,
+        Encode!(&()).unwrap(),
+        Some(admin),
+    );
 }

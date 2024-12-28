@@ -254,6 +254,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "bob-pool"
+version = "0.0.0"
+dependencies = [
+ "candid",
+ "candid_parser",
+ "ciborium",
+ "cycles-minting-canister",
+ "ic-base-types",
+ "ic-cdk 0.17.1",
+ "ic-cdk-timers 0.11.0",
+ "ic-icp-index",
+ "ic-ledger-core",
+ "ic-ledger-types",
+ "ic-management-canister-types",
+ "ic-stable-structures",
+ "ic-types",
+ "ic0 0.23.0",
+ "icp-ledger",
+ "icrc-ledger-client-cdk",
+ "icrc-ledger-types",
+ "rand",
+ "rand_chacha",
+ "scopeguard",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "bob_miner_v2"
 version = "0.0.0"
 dependencies = [
