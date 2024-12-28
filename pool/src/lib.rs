@@ -3,7 +3,7 @@ use cycles_minting_canister::NotifyError;
 use ic_ledger_core::block::BlockType;
 use ic_types::Cycles;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub const SEC_NANOS: u64 = 1_000_000_000;
 pub const DAY_NANOS: u64 = 24 * 60 * 60 * SEC_NANOS;
@@ -90,53 +90,31 @@ pub async fn notify_top_up(block_height: u64) -> Result<Cycles, String> {
 }
 
 thread_local! {
-    static __STATE: RefCell<Option<State>> = RefCell::default();
+    static __STATE: RefCell<State> = RefCell::default();
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct State {
-    pub bob_canister_id: Principal,
-    pub bob_ledger_id: Principal,
-    pub bob_miner_id: Principal,
-
-    pub principal_to_cycles: BTreeMap<Principal, u64>,
     pub principal_guards: BTreeSet<Principal>,
     pub active_tasks: BTreeSet<TaskType>,
-}
-
-impl State {
-    pub fn new(bob_miner_id: Principal) -> Self {
-        Self {
-            bob_canister_id: Principal::from_text("6lnhz-oaaaa-aaaas-aabkq-cai").unwrap(),
-            bob_ledger_id: Principal::from_text("7pail-xaaaa-aaaas-aabmq-cai").unwrap(),
-            bob_miner_id,
-            principal_to_cycles: BTreeMap::default(),
-            principal_guards: BTreeSet::default(),
-            active_tasks: BTreeSet::default(),
-        }
-    }
-}
-
-pub fn is_state_initialized() -> bool {
-    __STATE.with(|s| s.borrow_mut().is_some())
 }
 
 pub fn mutate_state<F, R>(f: F) -> R
 where
     F: FnOnce(&mut State) -> R,
 {
-    __STATE.with(|s| f(s.borrow_mut().as_mut().expect("State not initialized!")))
+    __STATE.with(|s| f(&mut s.borrow_mut()))
 }
 
 pub fn read_state<F, R>(f: F) -> R
 where
     F: FnOnce(&State) -> R,
 {
-    __STATE.with(|s| f(s.borrow().as_ref().expect("State not initialized!")))
+    __STATE.with(|s| f(&s.borrow()))
 }
 
 pub fn replace_state(state: State) {
     __STATE.with(|s| {
-        *s.borrow_mut() = Some(state);
+        *s.borrow_mut() = state;
     });
 }

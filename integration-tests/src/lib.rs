@@ -3,14 +3,13 @@
 mod setup;
 mod utils;
 
-use crate::setup::{deploy_pool, setup};
+use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
-    bob_balance, get_remaining_pool_cycles, is_pool_ready, join_native_pool, join_pool, mine_block,
-    spawn_miner, transfer_to_principal, transfer_topup_pool,
+    bob_balance, get_miner, get_remaining_pool_cycles, is_pool_ready, join_native_pool, join_pool,
+    mine_block, spawn_miner, transfer_to_principal, transfer_topup_pool,
 };
 use candid::{Nat, Principal};
 use pocket_ic::{update_candid_as, CallError};
-use std::time::Duration;
 
 // System canister IDs
 
@@ -117,12 +116,7 @@ fn test_join_pool() {
     let pic = setup(vec![admin, user_1, user_2]);
 
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
-    deploy_pool(&pic, admin);
-    assert!(!is_pool_ready(&pic));
-    while !is_pool_ready(&pic) {
-        pic.advance_time(Duration::from_secs(1));
-        pic.tick();
-    }
+    deploy_ready_pool(&pic, admin);
 
     for user in [admin, user_1, user_2] {
         assert_eq!(get_remaining_pool_cycles(&pic, user), None);
@@ -141,4 +135,28 @@ fn test_join_pool() {
             Some(7_800_000_000_000 * 2)
         );
     }
+}
+
+#[test]
+fn test_upgrade_pool() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let pic = setup(vec![admin]);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+    let bob_miner = get_miner(&pic).unwrap();
+
+    join_pool(&pic, admin, 100_000_000).unwrap();
+    assert_eq!(
+        get_remaining_pool_cycles(&pic, admin),
+        Some(7_800_000_000_000)
+    );
+
+    upgrade_pool(&pic, admin);
+    assert!(is_pool_ready(&pic));
+    assert_eq!(get_miner(&pic).unwrap(), bob_miner);
+    assert_eq!(
+        get_remaining_pool_cycles(&pic, admin),
+        Some(7_800_000_000_000)
+    );
 }

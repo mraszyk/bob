@@ -195,14 +195,18 @@ pub(crate) fn get_remaining_pool_cycles(pic: &PocketIc, user_id: Principal) -> O
     .map(|cycles| cycles.0.try_into().unwrap())
 }
 
-pub(crate) fn is_pool_ready(pic: &PocketIc) -> bool {
-    update_candid_as::<_, (bool,)>(
+pub(crate) fn get_miner(pic: &PocketIc) -> Option<Principal> {
+    update_candid_as::<_, (Option<Principal>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         Principal::anonymous(),
-        "is_ready",
+        "get_miner",
         ((),),
     )
     .unwrap()
     .0
+}
+
+pub(crate) fn is_pool_ready(pic: &PocketIc) -> bool {
+    get_miner(pic).is_some()
 }

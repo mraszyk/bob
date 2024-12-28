@@ -2,7 +2,7 @@ use candid::Principal;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{DefaultMemoryImpl as DefMem, StableBTreeMap, Storable};
+use ic_stable_structures::{DefaultMemoryImpl as DefMem, StableBTreeMap, StableCell, Storable};
 use std::borrow::Cow;
 use std::cell::RefCell;
 
@@ -30,7 +30,8 @@ where
 
 // NOTE: ensure that all memory ids are unique and
 // do not change across upgrades!
-const MINER_TO_CYCLES_MEM_ID: MemoryId = MemoryId::new(0);
+const BOB_MINER_CANISTER_MEM_ID: MemoryId = MemoryId::new(0);
+const MINER_TO_CYCLES_MEM_ID: MemoryId = MemoryId::new(1);
 
 type VM = VirtualMemory<DefMem>;
 
@@ -39,10 +40,23 @@ thread_local! {
         MM::init(DefaultMemoryImpl::default())
     );
 
+    static BOB_MINER_CANISTER: RefCell<StableCell<Option<Principal>, VM>> =
+        MEMORY_MANAGER.with(|mm| {
+        RefCell::new(StableCell::init(mm.borrow().get(BOB_MINER_CANISTER_MEM_ID), None).unwrap())
+        });
+
     static MINER_TO_CYCLES: RefCell<StableBTreeMap<Principal, u128, VM>> =
         MEMORY_MANAGER.with(|mm| {
         RefCell::new(StableBTreeMap::init(mm.borrow().get(MINER_TO_CYCLES_MEM_ID)))
         });
+}
+
+pub fn get_miner_canister() -> Option<Principal> {
+    BOB_MINER_CANISTER.with(|s| *s.borrow().get())
+}
+
+pub fn set_bob_miner_canister(bob_miner_canister: Principal) {
+    let _ = BOB_MINER_CANISTER.with(|s| s.borrow_mut().set(Some(bob_miner_canister)).unwrap());
 }
 
 pub fn insert_new_miner(miner: Principal, cycles: u128) {

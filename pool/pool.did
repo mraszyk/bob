@@ -1,6 +1,6 @@
 type Result = variant { Ok; Err : text };
 service : () -> {
   join_pool : (nat64) -> (Result);
+  get_miner : () -> (opt principal) query;
   get_remaining_cycles : () -> (opt nat) query;
-  is_ready : () -> (bool) query;
 }

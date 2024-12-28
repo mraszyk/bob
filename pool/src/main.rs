@@ -1,9 +1,10 @@
 use bob_pool::guard::GuardPrincipal;
-use bob_pool::memory::{get_miner_cycles, insert_new_miner};
+use bob_pool::memory::{
+    get_miner_canister, get_miner_cycles, insert_new_miner, set_bob_miner_canister,
+};
 use bob_pool::{
-    fetch_block, is_state_initialized, notify_top_up, replace_state, State,
-    MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID,
-    MAINNET_LEDGER_INDEX_CANISTER_ID,
+    fetch_block, notify_top_up, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
+    MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
 };
 use candid::{Nat, Principal};
 use ic_cdk::{init, query, update};
@@ -78,15 +79,18 @@ fn init() {
         ic_cdk::spawn(async move {
             let block_index = transfer_topup_bob(100_000_000).await;
             let bob_miner_id = spawn_miner(block_index).await;
-            let state = State::new(bob_miner_id);
-            replace_state(state);
+            set_bob_miner_canister(bob_miner_id);
         })
     });
 }
 
 #[query]
+fn get_miner() -> Option<Principal> {
+    get_miner_canister()
+}
+
 fn is_ready() -> bool {
-    is_state_initialized()
+    get_miner_canister().is_some()
 }
 
 #[query]

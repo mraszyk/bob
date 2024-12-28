@@ -1,7 +1,7 @@
 use crate::{
-    BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID, NNS_CYCLES_MINTING_CANISTER_ID,
-    NNS_GOVERNANCE_CANISTER_ID, NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
-    NNS_ROOT_CANISTER_ID,
+    is_pool_ready, BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID,
+    NNS_CYCLES_MINTING_CANISTER_ID, NNS_GOVERNANCE_CANISTER_ID, NNS_ICP_INDEX_CANISTER_ID,
+    NNS_ICP_LEDGER_CANISTER_ID, NNS_ROOT_CANISTER_ID,
 };
 use candid::{CandidType, Encode, Principal};
 use ic_icrc1_ledger::{InitArgsBuilder, LedgerArgument};
@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 // System canister init args
 
@@ -247,4 +247,24 @@ pub(crate) fn deploy_pool(pic: &PocketIc, admin: Principal) {
         Encode!(&()).unwrap(),
         Some(admin),
     );
+}
+
+pub(crate) fn deploy_ready_pool(pic: &PocketIc, admin: Principal) {
+    deploy_pool(pic, admin);
+    assert!(!is_pool_ready(pic));
+    while !is_pool_ready(pic) {
+        pic.advance_time(Duration::from_secs(1));
+        pic.tick();
+    }
+}
+
+pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) {
+    let bob_pool_canister_wasm = get_canister_wasm("bob-pool").to_vec();
+    pic.upgrade_canister(
+        BOB_POOL_CANISTER_ID,
+        bob_pool_canister_wasm,
+        Encode!(&()).unwrap(),
+        Some(admin),
+    )
+    .unwrap();
 }
