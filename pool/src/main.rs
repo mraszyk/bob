@@ -36,7 +36,7 @@ async fn transfer_topup_bob(amount: u64) -> u64 {
     .0
     .unwrap();
     ic_cdk::print(format!(
-        "send BoB top up transfer at block index {}",
+        "Sent BoB top up transfer at block index {}.",
         block_index
     ));
     let get_blocks_args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {
