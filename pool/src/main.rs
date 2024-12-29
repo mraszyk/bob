@@ -140,6 +140,12 @@ fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
     if bob_pool::memory::get_member_cycles(caller).is_none() {
         return Err(format!("The caller {} is no pool member.", caller));
     }
+    if block_cycles.clone() % 1_000_000_u64 != 0_u64 {
+        return Err(format!(
+            "The number of block cycles {} is not a multiple of 1,000,000.",
+            block_cycles
+        ));
+    }
     bob_pool::memory::set_member_block_cycles(caller, block_cycles);
     Ok(())
 }
