@@ -164,7 +164,7 @@ fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
     }
     if block_cycles.clone() % 1_000_000_u64 != 0_u64 {
         return Err(format!(
-            "The number of block cycles {} is not a multiple of 1,000,000.",
+            "The number of block cycles {} is not a multiple of 1_000_000.",
             block_cycles
         ));
     }

@@ -224,7 +224,7 @@ fn test_set_member_block_cycles() {
 
     let err = set_member_block_cycles(&pic, admin, 100_000_000_001_u128).unwrap_err();
     assert!(
-        err.contains("The number of block cycles 100_000_000_001 is not a multiple of 1,000,000.")
+        err.contains("The number of block cycles 100_000_000_001 is not a multiple of 1_000_000.")
     );
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
