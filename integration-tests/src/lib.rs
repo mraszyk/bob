@@ -108,6 +108,8 @@ fn test_native_pool() {
     assert_eq!(bob_balance(&pic, user_2), 60_000_000_000_u64);
 }
 
+// Test pool
+
 #[test]
 fn test_pool_not_ready() {
     let admin = Principal::from_slice(&[0xFF; 29]);
