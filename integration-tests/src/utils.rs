@@ -172,11 +172,11 @@ pub(crate) fn get_latest_blocks(pic: &PocketIc) -> Vec<Block> {
     .0
 }
 
-pub(crate) fn mine_block(pic: &PocketIc) {
+pub(crate) fn mine_block_(pic: &PocketIc, step: std::time::Duration) {
     let old_stats = get_stats(pic);
 
     loop {
-        pic.advance_time(std::time::Duration::from_secs(60));
+        pic.advance_time(step);
         pic.tick();
         let new_stats = get_stats(pic);
         if new_stats.block_count > old_stats.block_count {
@@ -187,6 +187,10 @@ pub(crate) fn mine_block(pic: &PocketIc) {
             break;
         }
     }
+}
+
+pub(crate) fn mine_block(pic: &PocketIc) {
+    mine_block_(pic, std::time::Duration::from_secs(60));
 }
 
 pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {

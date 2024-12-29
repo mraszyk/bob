@@ -10,6 +10,14 @@ pub struct MinerSettings {
     pub new_owner: Option<Principal>,
 }
 
+#[derive(CandidType, Deserialize)]
+pub struct StatsV2 {
+    pub cycle_balance: u64,
+    pub cycles_burned_per_round: u128,
+    pub round_length_secs: u64,
+    pub last_round_cyles_burned: u128,
+}
+
 pub async fn process_logic() {
     let max_cycles_per_round = read_state(|s| s.max_cycles_per_round);
 

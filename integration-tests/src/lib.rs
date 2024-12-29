@@ -6,8 +6,8 @@ mod utils;
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
     bob_balance, get_latest_blocks, get_member_cycles, get_miner, is_pool_ready, join_native_pool,
-    join_pool, mine_block, pool_logs, set_member_block_cycles, spawn_miner, transfer_to_principal,
-    transfer_topup_pool, update_miner_block_cycles, upgrade_miner,
+    join_pool, mine_block, mine_block_, pool_logs, set_member_block_cycles, spawn_miner,
+    transfer_to_principal, transfer_topup_pool, update_miner_block_cycles, upgrade_miner,
 };
 use bob_pool::MemberCycles;
 use candid::Principal;
@@ -259,4 +259,28 @@ fn test_pool_inactive_by_default() {
     let blocks = get_latest_blocks(&pic);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].total_cycles_burned.unwrap() as u128, miner_cycles);
+}
+
+#[test]
+fn test_pool_rewards() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let user = Principal::from_slice(&[0xFF; 29]);
+    let pic = setup(vec![admin, user]);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+    mine_block(&pic);
+
+    join_pool(&pic, admin, 100_000_000).unwrap();
+
+    let miner_cycles = 10_000_000_000;
+    set_member_block_cycles(&pic, admin, miner_cycles).unwrap();
+
+    mine_block_(&pic, std::time::Duration::from_secs(1));
+
+    let blocks = get_latest_blocks(&pic);
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[1].total_cycles_burned.unwrap() as u128, miner_cycles);
 }

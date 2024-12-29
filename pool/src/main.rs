@@ -1,15 +1,27 @@
-use bob_miner_v2::MinerSettings;
+use bob_miner_v2::{MinerSettings, StatsV2};
+use bob_minter_v2::Stats;
 use bob_pool::guard::GuardPrincipal;
-use bob_pool::memory::{add_member_total_cycles, get_miner_canister, set_miner_canister};
+use bob_pool::memory::{
+    add_member_total_cycles, add_rewards, commit_block_participants, get_miner_canister,
+    get_next_block_participants, get_rewards, set_miner_canister, set_rewards,
+    total_pending_rewards,
+};
 use bob_pool::{
     fetch_block, notify_top_up, MemberCycles, MAINNET_BOB_CANISTER_ID,
-    MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
+    MAINNET_BOB_LEDGER_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID,
+    MAINNET_LEDGER_INDEX_CANISTER_ID,
 };
 use candid::{Nat, Principal};
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
-use ic_cdk::{init, inspect_message, query, trap, update};
+use ic_cdk::api::canister_balance128;
+use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
+use ic_cdk::{init, inspect_message, post_upgrade, query, trap, update};
 use ic_ledger_types::TransferResult;
 use icp_ledger::{AccountIdentifier, Memo, Operation, Subaccount, Tokens, TransferArgs};
+use icrc_ledger_types::icrc1::account::Account;
+use icrc_ledger_types::icrc1::transfer::{TransferArg, TransferError};
+use std::collections::BTreeSet;
+use std::future::Future;
 use std::time::Duration;
 
 fn main() {}
@@ -33,6 +45,235 @@ fn inspect_message() {
             method
         ));
     }
+}
+
+async fn get_bob_balance() -> Result<u128, String> {
+    ic_cdk::call::<_, (Nat,)>(
+        MAINNET_BOB_LEDGER_CANISTER_ID,
+        "icrc1_balance_of",
+        (Account {
+            owner: ic_cdk::id(),
+            subaccount: None,
+        },),
+    )
+    .await
+    .map(|res| res.0 .0.try_into().unwrap())
+    .map_err(|(code, msg)| {
+        format!(
+            "Error while calling BoB ledger canister ({:?}): {}",
+            code, msg
+        )
+    })
+}
+
+async fn transfer_bob(user_id: Principal, amount: u128) -> Result<u64, String> {
+    ic_cdk::call::<_, (Result<Nat, TransferError>,)>(
+        MAINNET_BOB_LEDGER_CANISTER_ID,
+        "icrc1_transfer",
+        (TransferArg {
+            from_subaccount: None,
+            to: Account {
+                owner: user_id,
+                subaccount: None,
+            },
+            fee: Some(1_000_000_u64.into()),
+            created_at_time: None,
+            memo: None,
+            amount: amount.into(),
+        },),
+    )
+    .await
+    .map(|res| {
+        res.0
+            .map(|block| block.0.try_into().unwrap())
+            .map_err(|err| format!("Error from BoB ledger canister: {}", err))
+    })
+    .map_err(|(code, msg)| {
+        format!(
+            "Error while calling BoB ledger canister ({:?}): {}",
+            code, msg
+        )
+    })?
+}
+
+async fn get_bob_stats() -> Result<Stats, String> {
+    ic_cdk::call::<_, (Stats,)>(MAINNET_BOB_CANISTER_ID, "get_statistics", ((),))
+        .await
+        .map(|res| res.0)
+        .map_err(|(code, msg)| format!("Error while calling BoB canister ({:?}): {}", code, msg))
+}
+
+async fn get_miner_stats() -> Result<StatsV2, String> {
+    let miner = get_miner().unwrap();
+    ic_cdk::call::<_, (StatsV2,)>(miner, "get_statistics_v2", ((),))
+        .await
+        .map(|res| res.0)
+        .map_err(|(code, msg)| format!("Error while calling miner canister ({:?}): {}", code, msg))
+}
+
+async fn upgrade_miner() -> Result<(), String> {
+    let miner = get_miner().unwrap();
+    ic_cdk::call::<_, (Result<(), String>,)>(MAINNET_BOB_CANISTER_ID, "upgrade_miner", (miner,))
+        .await
+        .map(|res| res.0)
+        .map_err(|(code, msg)| format!("Error while calling BoB canister ({:?}): {}", code, msg))?
+}
+
+fn retry_and_log<F, A, Fut>(period: Duration, max_attempts: u64, phase: &'static str, f: F, arg: A)
+where
+    F: FnOnce(A) -> Fut + Copy + 'static,
+    A: Copy + 'static,
+    Fut: Future<Output = Result<(), String>>,
+{
+    ic_cdk::spawn(async move {
+        if max_attempts == 0 {
+            ic_cdk::print(format!(
+                "ERR(retry_and_log): Exceeded max attempts {} in {}: starting from scratch.",
+                max_attempts, phase
+            ));
+            if let Err(err) = update_miner_block_cycles(0).await {
+                ic_cdk::print(format!(
+                    "ERR(retry_and_log): Could not reset miner block cycles: {}",
+                    err
+                ));
+            }
+            if let Err(err) = check_rewards().await {
+                ic_cdk::print(format!(
+                    "ERR(retry_and_log): Failed to check rewards: {}",
+                    err
+                ));
+            }
+            run();
+        } else if let Err(err) = f(arg).await {
+            ic_cdk::print(format!("ERR({}): {}", phase, err));
+            ic_cdk_timers::set_timer(period, move || {
+                retry_and_log(period, max_attempts - 1, phase, f, arg);
+            });
+        }
+    });
+}
+
+async fn pay_rewards(idx: u64) -> Result<(), String> {
+    let mut rewards = get_rewards(idx);
+    let done: BTreeSet<_> = rewards
+        .transfer_idx
+        .iter()
+        .map(|(member, _)| member)
+        .cloned()
+        .collect();
+    for (member, amount) in rewards.participants.clone().into_iter() {
+        if !done.contains(&member) {
+            let block_idx = transfer_bob(member, amount).await?;
+            rewards.transfer_idx.push((member, block_idx));
+            set_rewards(idx, rewards.clone());
+        }
+    }
+    Ok(())
+}
+
+async fn check_rewards() -> Result<(), String> {
+    let bob_balance = get_bob_balance()
+        .await?
+        .checked_sub(total_pending_rewards())
+        .unwrap();
+    if bob_balance != 0_u128 {
+        let rewards_idx = add_rewards(bob_balance);
+        retry_and_log(
+            Duration::from_secs(600),
+            100,
+            "rewards",
+            pay_rewards,
+            rewards_idx,
+        );
+    }
+    Ok(())
+}
+
+fn run() {
+    retry_and_log(
+        Duration::from_secs(30),
+        10,
+        "schedule_stage_1",
+        schedule_stage_1,
+        (),
+    );
+}
+
+async fn schedule_stage_1(_: ()) -> Result<(), String> {
+    let stats = get_bob_stats().await?;
+    let time_since_last_block = stats.time_since_last_block;
+    if time_since_last_block >= 490 {
+        let block_count = stats.block_count;
+        return Err(format!(
+            "Time since last block {} too high: {}",
+            block_count, time_since_last_block
+        ));
+    }
+    ic_cdk_timers::set_timer(
+        Duration::from_secs(490 - time_since_last_block),
+        move || {
+            retry_and_log(Duration::from_secs(0), 1, "stage_1", stage_1, ());
+        },
+    );
+    Ok(())
+}
+
+async fn stage_1(_: ()) -> Result<(), String> {
+    check_rewards().await?;
+    let next_block_participants = get_next_block_participants();
+    let total_member_block_cycles = next_block_participants
+        .iter()
+        .map(|(_, block_cycles)| block_cycles)
+        .sum();
+    if total_member_block_cycles == 0 {
+        run();
+        return Ok(());
+    }
+    upgrade_miner().await?;
+    update_miner_block_cycles(total_member_block_cycles).await?;
+    let miner_stats = get_miner_stats().await?;
+    let target_miner_cycle_balance = total_member_block_cycles + 1_000_000_000_000;
+    let top_up_cycles = target_miner_cycle_balance.saturating_sub(miner_stats.cycle_balance.into());
+    if canister_balance128() - top_up_cycles < 1_000_000_000_000 {
+        trap(&format!(
+            "Pool cycles {} too low after topping up miner with {} cycles.",
+            canister_balance128(),
+            top_up_cycles
+        ));
+    }
+    let miner = get_miner().unwrap();
+    deposit_cycles(CanisterIdRecord { canister_id: miner }, top_up_cycles)
+        .await
+        .map_err(|(code, msg)| {
+            format!(
+                "Error while depositing cycles to miner ({:?}): {}",
+                code, msg
+            )
+        })?;
+    commit_block_participants(next_block_participants);
+    ic_cdk_timers::set_timer(Duration::from_secs(250), move || {
+        retry_and_log(
+            Duration::from_secs(10),
+            3,
+            "stage_2",
+            stage_2,
+            total_member_block_cycles,
+        )
+    });
+    Ok(())
+}
+
+async fn stage_2(total_member_block_cycles: u128) -> Result<(), String> {
+    let miner_stats = get_miner_stats().await?;
+    if miner_stats.last_round_cyles_burned != total_member_block_cycles {
+        return Err(format!(
+            "Last cycles burned {} do not match the expectation {}.",
+            miner_stats.last_round_cyles_burned, total_member_block_cycles
+        ));
+    }
+    update_miner_block_cycles(0).await?;
+    run();
+    Ok(())
 }
 
 async fn transfer_topup_bob(amount: u64) -> Result<u64, String> {
@@ -105,7 +346,7 @@ async fn spawn_miner(block_index: u64) -> Result<Principal, String> {
 }
 
 async fn update_miner_block_cycles(block_cycles: u128) -> Result<(), String> {
-    let miner_id = get_miner_canister().ok_or("Miner canister not set".to_string())?;
+    let miner_id = get_miner_canister().unwrap();
     let update_miner_settings_args = MinerSettings {
         max_cycles_per_round: Some(block_cycles),
         new_owner: None,
@@ -134,7 +375,15 @@ fn init() {
             update_miner_block_cycles(0)
                 .await
                 .unwrap_or_else(|err| trap(&format!("Could not update miner settings: {}", err)));
+            run();
         })
+    });
+}
+
+#[post_upgrade]
+async fn post_upgrade() {
+    ic_cdk_timers::set_timer(Duration::from_secs(0), move || {
+        run();
     });
 }
 

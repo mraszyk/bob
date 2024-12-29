@@ -257,6 +257,7 @@ dependencies = [
 name = "bob-pool"
 version = "0.0.0"
 dependencies = [
+ "bob-minter-v2",
  "bob_miner_v2",
  "candid",
  "candid_parser",

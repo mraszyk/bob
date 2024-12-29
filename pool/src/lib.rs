@@ -9,6 +9,9 @@ use std::collections::BTreeSet;
 pub const MAINNET_BOB_CANISTER_ID: Principal =
     Principal::from_slice(&[0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x00, 0x55, 0x01, 0x01]);
 
+pub const MAINNET_BOB_LEDGER_CANISTER_ID: Principal =
+    Principal::from_slice(&[0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x00, 0x59, 0x01, 0x01]);
+
 pub const MAINNET_LEDGER_CANISTER_ID: Principal =
     Principal::from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x01, 0x01]);
 
@@ -25,6 +28,15 @@ pub mod memory;
 pub struct MemberCycles {
     pub total: Nat,
     pub block: Nat,
+    pub pending: Nat,
+}
+
+#[derive(CandidType, Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Rewards {
+    pub total_amount: u128,
+    pub pending: u128,
+    pub participants: Vec<(Principal, u128)>,
+    pub transfer_idx: Vec<(Principal, u64)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

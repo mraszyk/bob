@@ -1,4 +1,4 @@
-use crate::MemberCycles;
+use crate::{MemberCycles, Rewards};
 use candid::{Nat, Principal};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::storable::Bound;
@@ -33,6 +33,7 @@ where
 // do not change across upgrades!
 const MINER_CANISTER_MEM_ID: MemoryId = MemoryId::new(0);
 const MEMBER_TO_CYCLES_MEM_ID: MemoryId = MemoryId::new(1);
+const REWARDS_MEM_ID: MemoryId = MemoryId::new(2);
 
 type VM = VirtualMemory<DefMem>;
 
@@ -49,6 +50,11 @@ thread_local! {
     static MEMBER_TO_CYCLES: RefCell<StableBTreeMap<Principal, Cbor<MemberCycles>, VM>> =
         MEMORY_MANAGER.with(|mm| {
         RefCell::new(StableBTreeMap::init(mm.borrow().get(MEMBER_TO_CYCLES_MEM_ID)))
+    });
+
+    static REWARDS: RefCell<StableBTreeMap<u64, Cbor<Rewards>, VM>> =
+        MEMORY_MANAGER.with(|mm| {
+        RefCell::new(StableBTreeMap::init(mm.borrow().get(REWARDS_MEM_ID)))
     });
 }
 
@@ -78,4 +84,88 @@ pub fn set_member_block_cycles(member: Principal, block_cycles: Nat) {
 
 pub fn get_member_cycles(member: Principal) -> Option<MemberCycles> {
     MEMBER_TO_CYCLES.with(|s| s.borrow().get(&member).map(|mc| mc.0))
+}
+
+pub fn get_next_block_participants() -> Vec<(Principal, u128)> {
+    MEMBER_TO_CYCLES.with(|s| {
+        s.borrow()
+            .iter()
+            .filter_map(|(member, mc)| {
+                if mc.0.block.clone() + 5_000_000_000_u64 <= mc.0.total {
+                    let block_cycles: u128 = mc.0.block.0.try_into().unwrap();
+                    Some((member, block_cycles))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    })
+}
+
+pub fn commit_block_participants(participants: Vec<(Principal, u128)>) {
+    let fee = 5_000_000_000_u128 / (participants.len() as u128);
+    MEMBER_TO_CYCLES.with(|s| {
+        for (member, block_cycles) in participants {
+            let mut mc = s.borrow().get(&member).unwrap().0;
+            mc.total -= block_cycles + fee;
+            mc.pending += block_cycles;
+            s.borrow_mut().insert(member, Cbor(mc));
+        }
+    });
+}
+
+pub fn add_rewards(total_bob: u128) -> u64 {
+    let num_beneficiaries = MEMBER_TO_CYCLES.with(|s| {
+        s.borrow()
+            .iter()
+            .filter(|(_, mc)| mc.0.pending != 0_u64)
+            .count()
+    });
+    let total_bob_fee = num_beneficiaries.checked_mul(1_000_000).unwrap() as u128;
+    let distribute_bob = total_bob.checked_sub(total_bob_fee).unwrap();
+    let total_cycles = MEMBER_TO_CYCLES.with(|s| {
+        s.borrow()
+            .iter()
+            .map(|(_, mc)| {
+                let pending: u128 = mc.0.pending.0.try_into().unwrap();
+                pending
+            })
+            .sum::<u128>()
+    });
+    let participants: Vec<(Principal, u128)> = MEMBER_TO_CYCLES.with(|s| {
+        s.borrow()
+            .iter()
+            .filter_map(|(member, mc)| {
+                if mc.0.pending != 0_u64 {
+                    let pending: u128 = mc.0.pending.0.try_into().unwrap();
+                    Some((member, distribute_bob * pending / total_cycles))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    });
+    let rewards = Cbor(Rewards {
+        total_amount: total_bob,
+        pending: participants.iter().map(|(_, amount)| amount).sum::<u128>() + total_bob_fee,
+        participants,
+        transfer_idx: vec![],
+    });
+    REWARDS.with(|s| {
+        let n = s.borrow().len();
+        s.borrow_mut().insert(n, rewards);
+        n
+    })
+}
+
+pub fn total_pending_rewards() -> u128 {
+    REWARDS.with(|s| s.borrow().iter().map(|(_, r)| r.0.pending).sum())
+}
+
+pub fn get_rewards(idx: u64) -> Rewards {
+    REWARDS.with(|s| s.borrow().get(&idx).unwrap().0)
+}
+
+pub fn set_rewards(idx: u64, rewards: Rewards) {
+    REWARDS.with(|s| s.borrow_mut().insert(idx, Cbor(rewards)));
 }
