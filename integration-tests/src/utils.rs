@@ -102,6 +102,19 @@ pub(crate) fn spawn_miner(pic: &PocketIc, user_id: Principal, amount: u64) -> Pr
     .unwrap()
 }
 
+pub(crate) fn upgrade_miner(pic: &PocketIc, user_id: Principal, miner_id: Principal) {
+    update_candid_as::<_, (Result<(), String>,)>(
+        pic,
+        BOB_CANISTER_ID,
+        user_id,
+        "upgrade_miner",
+        (miner_id,),
+    )
+    .unwrap()
+    .0
+    .unwrap()
+}
+
 pub(crate) fn join_native_pool(
     pic: &PocketIc,
     user_id: Principal,
