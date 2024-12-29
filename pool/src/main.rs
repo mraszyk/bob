@@ -6,12 +6,34 @@ use bob_pool::{
     MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
 };
 use candid::{Nat, Principal};
-use ic_cdk::{init, query, trap, update};
+use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
+use ic_cdk::{init, inspect_message, query, trap, update};
 use ic_ledger_types::TransferResult;
 use icp_ledger::{AccountIdentifier, Memo, Operation, Subaccount, Tokens, TransferArgs};
 use std::time::Duration;
 
 fn main() {}
+
+#[inspect_message]
+fn inspect_message() {
+    let method = method_name();
+    if method == "join_pool" || method == "set_member_block_cycles" {
+        let arg_size = arg_data_raw_size();
+        if arg_size > 1_000 {
+            trap(&format!(
+                "Unexpected argument length of {} for method {}.",
+                arg_size, method
+            ))
+        } else {
+            accept_message();
+        }
+    } else {
+        trap(&format!(
+            "The method {} cannot be called via ingress messages.",
+            method
+        ));
+    }
+}
 
 async fn transfer_topup_bob(amount: u64) -> Result<u64, String> {
     let sub = Subaccount::from(&ic_types::PrincipalId(MAINNET_BOB_CANISTER_ID));

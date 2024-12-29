@@ -12,7 +12,7 @@ use ic_ledger_types::{
 };
 use icrc_ledger_types::icrc1::account::Account;
 use pocket_ic::management_canister::CanisterLogRecord;
-use pocket_ic::{update_candid_as, PocketIc};
+use pocket_ic::{query_candid_as, update_candid_as, PocketIc};
 
 pub(crate) fn get_icp_block(pic: &PocketIc, block_index: u64) -> Option<icp_ledger::Block> {
     let get_blocks_args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {
@@ -208,7 +208,7 @@ pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
 }
 
 pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<MemberCycles> {
-    update_candid_as::<_, (Result<Option<MemberCycles>, String>,)>(
+    query_candid_as::<_, (Result<Option<MemberCycles>, String>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         user_id,
@@ -238,7 +238,7 @@ pub(crate) fn set_member_block_cycles(
 }
 
 pub(crate) fn get_miner(pic: &PocketIc) -> Option<Principal> {
-    update_candid_as::<_, (Option<Principal>,)>(
+    query_candid_as::<_, (Option<Principal>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         Principal::anonymous(),

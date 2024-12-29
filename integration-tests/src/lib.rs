@@ -11,7 +11,7 @@ use crate::utils::{
 };
 use bob_pool::MemberCycles;
 use candid::Principal;
-use pocket_ic::update_candid_as;
+use pocket_ic::{query_candid_as, update_candid_as};
 
 // System canister IDs
 
@@ -118,7 +118,7 @@ fn test_pool_not_ready() {
     deploy_pool(&pic, admin);
     assert!(!is_pool_ready(&pic));
 
-    let err = update_candid_as::<_, (Result<Option<MemberCycles>, String>,)>(
+    let err = query_candid_as::<_, (Result<Option<MemberCycles>, String>,)>(
         &pic,
         BOB_POOL_CANISTER_ID,
         admin,
