@@ -5,14 +5,14 @@ use bob_pool::{
     MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
 };
 use candid::{Nat, Principal};
-use ic_cdk::{init, query, update};
+use ic_cdk::{init, query, trap, update};
 use ic_ledger_types::TransferResult;
 use icp_ledger::{AccountIdentifier, Memo, Operation, Subaccount, Tokens, TransferArgs};
 use std::time::Duration;
 
 fn main() {}
 
-async fn transfer_topup_bob(amount: u64) -> u64 {
+async fn transfer_topup_bob(amount: u64) -> Result<u64, String> {
     let sub = Subaccount::from(&ic_types::PrincipalId(MAINNET_BOB_CANISTER_ID));
     let to = AccountIdentifier::new(
         ic_types::PrincipalId(MAINNET_CYCLE_MINTER_CANISTER_ID),
@@ -32,9 +32,14 @@ async fn transfer_topup_bob(amount: u64) -> u64 {
         (transfer_args,),
     )
     .await
-    .unwrap()
+    .map_err(|(code, msg)| {
+        format!(
+            "Error while calling ICP ledger canister ({:?}): {}",
+            code, msg
+        )
+    })?
     .0
-    .unwrap();
+    .map_err(|err| format!("Error from ICP ledger canister: {}", err))?;
     ic_cdk::print(format!(
         "Sent BoB top up transfer at block index {}.",
         block_index
@@ -50,33 +55,42 @@ async fn transfer_topup_bob(amount: u64) -> u64 {
             (get_blocks_args.clone(),),
         )
         .await
-        .unwrap()
+        .map_err(|(code, msg)| {
+            format!(
+                "Error while calling ICP index canister ({:?}): {}",
+                code, msg
+            )
+        })?
         .0;
         if blocks_raw.blocks.first().is_some() {
             break;
         }
     }
-    block_index
+    Ok(block_index)
 }
 
-async fn spawn_miner(block_index: u64) -> Principal {
+async fn spawn_miner(block_index: u64) -> Result<Principal, String> {
     ic_cdk::call::<_, (Result<Principal, String>,)>(
         MAINNET_BOB_CANISTER_ID,
         "spawn_miner",
         (block_index,),
     )
     .await
-    .unwrap()
+    .map_err(|(code, msg)| format!("Error while calling BoB canister ({:?}): {}", code, msg))?
     .0
-    .unwrap()
+    .map_err(|err| format!("Error from BoB canister: {}", err))
 }
 
 #[init]
 fn init() {
     ic_cdk_timers::set_timer(Duration::from_secs(0), move || {
         ic_cdk::spawn(async move {
-            let block_index = transfer_topup_bob(100_000_000).await;
-            let bob_miner_id = spawn_miner(block_index).await;
+            let block_index = transfer_topup_bob(100_000_000)
+                .await
+                .unwrap_or_else(|err| trap(&format!("Could not top up BoB: {}", err)));
+            let bob_miner_id = spawn_miner(block_index)
+                .await
+                .unwrap_or_else(|err| trap(&format!("Could not spawn miner: {}", err)));
             set_miner_canister(bob_miner_id);
         })
     });
@@ -87,19 +101,21 @@ fn get_miner() -> Option<Principal> {
     get_miner_canister()
 }
 
-fn is_ready() -> bool {
-    get_miner_canister().is_some()
+fn ensure_ready() -> Result<(), String> {
+    get_miner_canister()
+        .map(|_| ())
+        .ok_or("BoB pool canister is not ready; please try again later.".to_string())
 }
 
 #[query]
-fn get_member_cycles() -> Option<MemberCycles> {
-    assert!(is_ready());
-    bob_pool::memory::get_member_cycles(ic_cdk::caller())
+fn get_member_cycles() -> Result<Option<MemberCycles>, String> {
+    ensure_ready()?;
+    Ok(bob_pool::memory::get_member_cycles(ic_cdk::caller()))
 }
 
 #[update]
 fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
-    assert!(is_ready());
+    ensure_ready()?;
     let caller = ic_cdk::caller();
     if bob_pool::memory::get_member_cycles(caller).is_none() {
         return Err(format!("The caller {} is no pool member.", caller));
@@ -110,27 +126,34 @@ fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
 
 #[update]
 async fn join_pool(block_index: u64) -> Result<(), String> {
-    assert!(is_ready());
+    ensure_ready()?;
     let caller = ic_cdk::caller();
     if caller == Principal::anonymous() {
-        return Err("cannot join pool anonymously".to_string());
+        return Err("Anonymous principal cannot join pool.".to_string());
     }
-    let _guard_principal =
-        GuardPrincipal::new(caller).map_err(|guard_error| format!("{:?}", guard_error))?;
+    let _guard_principal = GuardPrincipal::new(caller)
+        .map_err(|guard_error| format!("Concurrency error: {:?}", guard_error))?;
 
     let transaction = fetch_block(block_index).await?.transaction;
 
-    if transaction.memo != icp_ledger::Memo(1347768404) {
-        return Err("invalid memo".to_string());
+    let expected_memo = 1347768404;
+    if transaction.memo != icp_ledger::Memo(expected_memo) {
+        return Err(format!(
+            "Invalid memo ({}): should be {}.",
+            transaction.memo.0, expected_memo
+        ));
     }
 
     if let Operation::Transfer {
         from, to, amount, ..
     } = transaction.operation
     {
-        let caller_account = AccountIdentifier::new(ic_types::PrincipalId(caller), None);
-        if from != caller_account {
-            panic!("unexpected caller");
+        let expect_from = AccountIdentifier::new(ic_types::PrincipalId(caller), None);
+        if from != expect_from {
+            return Err(format!(
+                "Unexpected sender account ({}): should be {}.",
+                from, expect_from
+            ));
         }
         let sub = Subaccount::from(&ic_types::PrincipalId(ic_cdk::id()));
         let expect_to = AccountIdentifier::new(
@@ -138,19 +161,25 @@ async fn join_pool(block_index: u64) -> Result<(), String> {
             Some(sub),
         );
         if to != expect_to {
-            panic!("unexpected destintaion");
+            return Err(format!(
+                "Unexpected destination account ({}): should be {}.",
+                to, expect_to
+            ));
         }
-        assert!(
-            amount >= icp_ledger::Tokens::from_e8s(99_990_000_u64),
-            "amount too low"
-        );
+        let min_amount = icp_ledger::Tokens::from_e8s(99_990_000_u64);
+        if amount < min_amount {
+            return Err(format!(
+                "Transaction amount ({}) too low: should be at least {}.",
+                amount, min_amount
+            ));
+        }
 
         let res = notify_top_up(block_index).await?;
         add_member_total_cycles(caller, res.get());
 
         Ok(())
     } else {
-        Err("expected transfer".to_string())
+        Err("Unexpected transaction operation: should be transfer.".to_string())
     }
 }
 

@@ -6,12 +6,12 @@ mod utils;
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
     bob_balance, get_member_cycles, get_miner, is_pool_ready, join_native_pool, join_pool,
-    mine_block, set_member_block_cycles, spawn_miner, transfer_to_principal, transfer_topup_pool,
-    upgrade_miner,
+    mine_block, pool_logs, set_member_block_cycles, spawn_miner, transfer_to_principal,
+    transfer_topup_pool, upgrade_miner,
 };
 use bob_pool::MemberCycles;
 use candid::Principal;
-use pocket_ic::{update_candid_as, CallError};
+use pocket_ic::update_candid_as;
 
 // System canister IDs
 
@@ -79,17 +79,9 @@ fn test_native_pool() {
     mine_block(&pic);
     assert_eq!(bob_balance(&pic, user_1), 30_000_000_000_u64);
     assert_eq!(bob_balance(&pic, user_2), 30_000_000_000_u64);
-}
-
-fn assert_pool_not_ready_error(err: CallError) {
-    match err {
-        CallError::UserError(user_error) => {
-            assert!(user_error
-                .description
-                .contains("assertion failed: is_ready()"));
-        }
-        CallError::Reject(error_msg) => panic!("Unexpected reject: {}", error_msg),
-    }
+    mine_block(&pic);
+    assert_eq!(bob_balance(&pic, user_1), 60_000_000_000_u64);
+    assert_eq!(bob_balance(&pic, user_2), 60_000_000_000_u64);
 }
 
 #[test]
@@ -100,15 +92,17 @@ fn test_pool_not_ready() {
     deploy_pool(&pic, admin);
     assert!(!is_pool_ready(&pic));
 
-    let err = update_candid_as::<_, (Option<MemberCycles>,)>(
+    let err = update_candid_as::<_, (Result<Option<MemberCycles>, String>,)>(
         &pic,
         BOB_POOL_CANISTER_ID,
         admin,
         "get_member_cycles",
         ((),),
     )
+    .unwrap()
+    .0
     .unwrap_err();
-    assert_pool_not_ready_error(err);
+    assert!(err.contains("BoB pool canister is not ready; please try again later."));
 
     let block_index = transfer_topup_pool(&pic, admin, 100_000_000);
     let err = update_candid_as::<_, (Result<(), String>,)>(
@@ -118,8 +112,13 @@ fn test_pool_not_ready() {
         "join_pool",
         ((block_index),),
     )
+    .unwrap()
+    .0
     .unwrap_err();
-    assert_pool_not_ready_error(err);
+    assert!(err.contains("BoB pool canister is not ready; please try again later."));
+
+    assert_eq!(pool_logs(&pic, admin).len(), 1);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone()).unwrap().contains("[TRAP]: Could not top up BoB: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000"));
 }
 
 #[test]
@@ -134,9 +133,9 @@ fn test_join_pool() {
 
     for user in [admin, user_1, user_2] {
         assert!(get_member_cycles(&pic, user).is_none());
-        assert!(join_pool(&pic, user, 10_000_000)
-            .unwrap_err()
-            .contains("amount too low"));
+        assert!(join_pool(&pic, user, 10_000_000).unwrap_err().contains(
+            "Transaction amount (0.10000000 Token) too low: should be at least 0.99990000 Token."
+        ));
         assert!(get_member_cycles(&pic, user).is_none());
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
@@ -147,6 +146,11 @@ fn test_join_pool() {
         assert_eq!(member_cycles.total, 2 * 7_800_000_000_000_u64);
         assert_eq!(member_cycles.block, 0_u64);
     }
+
+    assert_eq!(pool_logs(&pic, admin).len(), 1);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Sent BoB top up transfer at block index 4."));
 }
 
 #[test]
@@ -170,6 +174,11 @@ fn test_upgrade_pool() {
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
     assert_eq!(member_cycles.block, 100_000_000_000_u64);
+
+    assert_eq!(pool_logs(&pic, admin).len(), 1);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Sent BoB top up transfer at block index 2."));
 }
 
 #[test]
@@ -186,4 +195,9 @@ fn test_set_member_block_cycles() {
     join_pool(&pic, admin, 100_000_000).unwrap();
 
     set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap();
+
+    assert_eq!(pool_logs(&pic, admin).len(), 1);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Sent BoB top up transfer at block index 2."));
 }

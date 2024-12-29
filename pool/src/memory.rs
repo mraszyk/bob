@@ -71,7 +71,7 @@ pub fn add_member_total_cycles(member: Principal, new_cycles: u128) {
 pub fn set_member_block_cycles(member: Principal, block_cycles: Nat) {
     MEMBER_TO_CYCLES.with(|s| {
         let mut member_cycles = s.borrow().get(&member).unwrap_or_default();
-        member_cycles.0.block += block_cycles;
+        member_cycles.0.block = block_cycles;
         s.borrow_mut().insert(member, member_cycles)
     });
 }

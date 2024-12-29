@@ -2,10 +2,14 @@ type MemberCycles = record {
   total : nat;
   block : nat;
 };
+type MemberCyclesResult = variant {
+  Ok : opt MemberCycles;
+  Err : text;
+};
 type Result = variant { Ok; Err : text };
 service : () -> {
   get_miner : () -> (opt principal) query;
-  get_member_cycles : () -> (opt MemberCycles) query;
+  get_member_cycles : () -> (MemberCyclesResult) query;
   join_pool : (nat64) -> (Result);
   set_member_block_cycles : (nat) -> (Result);
 }
