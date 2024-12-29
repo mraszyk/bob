@@ -6,8 +6,9 @@ mod utils;
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
     bob_balance, get_latest_blocks, get_member_cycles, get_miner, is_pool_ready, join_native_pool,
-    join_pool, mine_block, mine_block_, pool_logs, set_member_block_cycles, spawn_miner,
-    transfer_to_principal, transfer_topup_pool, update_miner_block_cycles, upgrade_miner,
+    join_pool, mine_block, mine_block_with_round_length, pool_logs, set_member_block_cycles,
+    spawn_miner, transfer_to_principal, transfer_topup_pool, update_miner_block_cycles,
+    upgrade_miner,
 };
 use bob_pool::MemberCycles;
 use candid::Principal;
@@ -243,7 +244,7 @@ fn test_set_member_block_cycles() {
 #[test]
 fn test_pool_inactive_by_default() {
     let admin = Principal::from_slice(&[0xFF; 29]);
-    let user = Principal::from_slice(&[0xFF; 29]);
+    let user = Principal::from_slice(&[0xFE; 29]);
     let pic = setup(vec![admin, user]);
 
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
@@ -259,28 +260,79 @@ fn test_pool_inactive_by_default() {
     let blocks = get_latest_blocks(&pic);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].total_cycles_burned.unwrap() as u128, miner_cycles);
+
+    assert_eq!(pool_logs(&pic, admin).len(), 1);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Sent BoB top up transfer at block index 3."));
 }
 
 #[test]
 fn test_pool_rewards() {
     let admin = Principal::from_slice(&[0xFF; 29]);
-    let user = Principal::from_slice(&[0xFF; 29]);
-    let pic = setup(vec![admin, user]);
+    let user_1 = Principal::from_slice(&[0xFE; 29]);
+    let user_2 = Principal::from_slice(&[0xFD; 29]);
+    let user = Principal::from_slice(&[0xFC; 29]);
+    let pic = setup(vec![admin, user_1, user_2, user]);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+    let miner_cycles = 15_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
+    mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
 
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
     deploy_ready_pool(&pic, admin);
 
-    let miner = spawn_miner(&pic, user, 100_000_000);
-    mine_block(&pic);
+    join_pool(&pic, admin, 1_000_000_000).unwrap();
+    join_pool(&pic, user_1, 1_000_000_000).unwrap();
+    join_pool(&pic, user_2, 1_000_000_000).unwrap();
 
-    join_pool(&pic, admin, 100_000_000).unwrap();
+    let admin_block_cycles = 3_000_000_000_000;
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+    let user_1_block_cycles = 4_000_000_000_000;
+    set_member_block_cycles(&pic, user_1, user_1_block_cycles).unwrap();
+    let user_2_block_cycles = 5_000_000_000_000;
+    set_member_block_cycles(&pic, user_2, user_2_block_cycles).unwrap();
 
-    let miner_cycles = 10_000_000_000;
-    set_member_block_cycles(&pic, admin, miner_cycles).unwrap();
+    let num_blocks = 5;
+    for _ in 0..num_blocks {
+        mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
+    }
 
-    mine_block_(&pic, std::time::Duration::from_secs(1));
+    // wait for BoB transfers
+    for _ in 0..100 {
+        pic.advance_time(std::time::Duration::from_secs(1));
+        pic.tick();
+    }
 
     let blocks = get_latest_blocks(&pic);
-    assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[1].total_cycles_burned.unwrap() as u128, miner_cycles);
+    assert_eq!(blocks.len(), num_blocks + 1);
+    let total_block_cycles = admin_block_cycles + user_1_block_cycles + user_2_block_cycles;
+    for block in blocks.iter().take(num_blocks - 1) {
+        assert!(block.total_cycles_burned.unwrap() as u128 >= total_block_cycles);
+        assert!(
+            block.total_cycles_burned.unwrap() as u128 <= total_block_cycles + 2 * miner_cycles
+        );
+    }
+
+    assert_eq!(
+        bob_balance(&pic, admin) as u128,
+        (60_000_000_000 - 3_000_000) * admin_block_cycles * (num_blocks - 1) as u128
+            / total_block_cycles
+    );
+    assert_eq!(
+        bob_balance(&pic, user_1) as u128,
+        (60_000_000_000 - 3_000_000) * user_1_block_cycles * (num_blocks - 1) as u128
+            / total_block_cycles
+    );
+    assert_eq!(
+        bob_balance(&pic, user_2) as u128,
+        (60_000_000_000 - 3_000_000) * user_2_block_cycles * (num_blocks - 1) as u128
+            / total_block_cycles
+    );
+
+    assert_eq!(pool_logs(&pic, admin).len(), 1);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Sent BoB top up transfer at block index 7."));
 }

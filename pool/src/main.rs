@@ -164,6 +164,7 @@ async fn pay_rewards(idx: u64) -> Result<(), String> {
     for (member, amount) in rewards.participants.clone().into_iter() {
         if !done.contains(&member) {
             let block_idx = transfer_bob(member, amount).await?;
+            rewards.pending = rewards.pending.checked_sub(amount + 1_000_000).unwrap();
             rewards.transfer_idx.push((member, block_idx));
             set_rewards(idx, rewards.clone());
         }

@@ -172,7 +172,7 @@ pub(crate) fn get_latest_blocks(pic: &PocketIc) -> Vec<Block> {
     .0
 }
 
-pub(crate) fn mine_block_(pic: &PocketIc, step: std::time::Duration) {
+pub(crate) fn mine_block_with_round_length(pic: &PocketIc, step: std::time::Duration) {
     let old_stats = get_stats(pic);
 
     loop {
@@ -190,7 +190,7 @@ pub(crate) fn mine_block_(pic: &PocketIc, step: std::time::Duration) {
 }
 
 pub(crate) fn mine_block(pic: &PocketIc) {
-    mine_block_(pic, std::time::Duration::from_secs(60));
+    mine_block_with_round_length(pic, std::time::Duration::from_secs(60));
 }
 
 pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
