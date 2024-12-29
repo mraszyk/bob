@@ -1,7 +1,14 @@
 use candid::{CandidType, Principal};
+use serde::Deserialize;
 use std::cell::RefCell;
 
 const DEFAULT_BURNED_CYCLES_PER_ROUND: u128 = 10_000_000_001;
+
+#[derive(CandidType, Deserialize)]
+pub struct MinerSettings {
+    pub max_cycles_per_round: Option<u128>,
+    pub new_owner: Option<Principal>,
+}
 
 pub async fn process_logic() {
     let max_cycles_per_round = read_state(|s| s.max_cycles_per_round);

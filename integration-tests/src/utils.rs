@@ -2,7 +2,8 @@ use crate::{
     BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID, NNS_CYCLES_MINTING_CANISTER_ID,
     NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
 };
-use bob_minter_v2::Stats;
+use bob_miner_v2::MinerSettings;
+use bob_minter_v2::{Block, Stats};
 use bob_pool::MemberCycles;
 use candid::{Nat, Principal};
 use ic_ledger_core::block::BlockType;
@@ -159,6 +160,18 @@ pub(crate) fn get_stats(pic: &PocketIc) -> Stats {
     .0
 }
 
+pub(crate) fn get_latest_blocks(pic: &PocketIc) -> Vec<Block> {
+    update_candid_as::<_, (Vec<Block>,)>(
+        pic,
+        BOB_CANISTER_ID,
+        Principal::anonymous(),
+        "get_latest_blocks",
+        ((),),
+    )
+    .unwrap()
+    .0
+}
+
 pub(crate) fn mine_block(pic: &PocketIc) {
     let old_stats = get_stats(pic);
 
@@ -243,4 +256,24 @@ pub(crate) fn is_pool_ready(pic: &PocketIc) -> bool {
 pub(crate) fn pool_logs(pic: &PocketIc, user_id: Principal) -> Vec<CanisterLogRecord> {
     pic.fetch_canister_logs(BOB_POOL_CANISTER_ID, user_id)
         .unwrap()
+}
+
+pub(crate) fn update_miner_block_cycles(
+    pic: &PocketIc,
+    user_id: Principal,
+    miner_id: Principal,
+    block_cycles: u128,
+) {
+    let miner_settings_args = MinerSettings {
+        max_cycles_per_round: Some(block_cycles),
+        new_owner: None,
+    };
+    update_candid_as::<_, ((),)>(
+        pic,
+        miner_id,
+        user_id,
+        "update_miner_settings",
+        ((miner_settings_args),),
+    )
+    .unwrap();
 }

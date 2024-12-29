@@ -84,6 +84,9 @@ fn get_latest_blocks() -> Vec<Block> {
                 result.push(block);
             }
         }
+        if max_index == 0 {
+            break;
+        }
         max_index = max_index.checked_sub(1).unwrap();
     }
     result

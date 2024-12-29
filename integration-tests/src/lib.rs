@@ -5,9 +5,9 @@ mod utils;
 
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
-    bob_balance, get_member_cycles, get_miner, is_pool_ready, join_native_pool, join_pool,
-    mine_block, pool_logs, set_member_block_cycles, spawn_miner, transfer_to_principal,
-    transfer_topup_pool, upgrade_miner,
+    bob_balance, get_latest_blocks, get_member_cycles, get_miner, is_pool_ready, join_native_pool,
+    join_pool, mine_block, pool_logs, set_member_block_cycles, spawn_miner, transfer_to_principal,
+    transfer_topup_pool, update_miner_block_cycles, upgrade_miner,
 };
 use bob_pool::MemberCycles;
 use candid::Principal;
@@ -63,6 +63,30 @@ fn test_spawn_upgrade_miner() {
     assert_eq!(bob_balance(&pic, user_id), 180_000_000_000_u64);
     mine_block(&pic);
     assert_eq!(bob_balance(&pic, user_id), 240_000_000_000_u64);
+}
+
+#[test]
+fn test_update_miner_block_cycles() {
+    let user_1 = Principal::from_slice(&[0xFF; 29]);
+    let user_2 = Principal::from_slice(&[0xFE; 29]);
+    let pic = setup(vec![user_1, user_2]);
+
+    let miner_1 = spawn_miner(&pic, user_1, 100_000_000);
+    let miner_2 = spawn_miner(&pic, user_2, 100_000_000);
+
+    let miner_1_cycles = 50_000_000_000;
+    let miner_2_cycles = 100_000_000_000;
+    update_miner_block_cycles(&pic, user_1, miner_1, miner_1_cycles);
+    update_miner_block_cycles(&pic, user_2, miner_2, miner_2_cycles);
+
+    mine_block(&pic);
+
+    let blocks = get_latest_blocks(&pic);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(
+        blocks[0].total_cycles_burned.unwrap() as u128,
+        miner_1_cycles + miner_2_cycles
+    );
 }
 
 #[test]

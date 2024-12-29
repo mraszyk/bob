@@ -4,6 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+bob_miner_v2 = { path = "../miner-v2" }
 bob-minter-v2 = { path = "../minter-v2" }
 bob-pool = { path = "../pool" }
 candid = { workspace = true }

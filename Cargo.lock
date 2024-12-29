@@ -2361,6 +2361,7 @@ version = "0.0.1"
 dependencies = [
  "bob-minter-v2",
  "bob-pool",
+ "bob_miner_v2",
  "candid",
  "candid_parser",
  "hex",
