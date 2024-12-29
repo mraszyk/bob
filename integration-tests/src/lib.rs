@@ -227,3 +227,24 @@ fn test_set_member_block_cycles() {
         .unwrap()
         .contains("Sent BoB top up transfer at block index 2."));
 }
+
+#[test]
+fn test_pool_inactive_by_default() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let user = Principal::from_slice(&[0xFF; 29]);
+    let pic = setup(vec![admin, user]);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+
+    let miner_cycles = 50_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
+
+    mine_block(&pic);
+
+    let blocks = get_latest_blocks(&pic);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].total_cycles_burned.unwrap() as u128, miner_cycles);
+}

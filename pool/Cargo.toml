@@ -6,6 +6,7 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
+bob_miner_v2 = { path = "../miner-v2" }
 candid = { workspace = true }
 candid_parser = { workspace = true }
 ciborium = { workspace = true }

@@ -1,3 +1,4 @@
+use bob_miner_v2::MinerSettings;
 use bob_pool::guard::GuardPrincipal;
 use bob_pool::memory::{add_member_total_cycles, get_miner_canister, set_miner_canister};
 use bob_pool::{
@@ -81,6 +82,22 @@ async fn spawn_miner(block_index: u64) -> Result<Principal, String> {
     .map_err(|err| format!("Error from BoB canister: {}", err))
 }
 
+async fn update_miner_block_cycles(block_cycles: u128) -> Result<(), String> {
+    let miner_id = get_miner_canister().ok_or("Miner canister not set".to_string())?;
+    let update_miner_settings_args = MinerSettings {
+        max_cycles_per_round: Some(block_cycles),
+        new_owner: None,
+    };
+    ic_cdk::call::<_, ((),)>(
+        miner_id,
+        "update_miner_settings",
+        (update_miner_settings_args,),
+    )
+    .await
+    .map(|res| res.0)
+    .map_err(|(code, msg)| format!("Error while calling miner ({:?}): {}", code, msg))
+}
+
 #[init]
 fn init() {
     ic_cdk_timers::set_timer(Duration::from_secs(0), move || {
@@ -92,6 +109,9 @@ fn init() {
                 .await
                 .unwrap_or_else(|err| trap(&format!("Could not spawn miner: {}", err)));
             set_miner_canister(bob_miner_id);
+            update_miner_block_cycles(0)
+                .await
+                .unwrap_or_else(|err| trap(&format!("Could not update miner settings: {}", err)));
         })
     });
 }
