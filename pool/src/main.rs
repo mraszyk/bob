@@ -119,37 +119,33 @@ async fn upgrade_miner() -> Result<(), String> {
         .map_err(|(code, msg)| format!("Error while calling BoB canister ({:?}): {}", code, msg))?
 }
 
-fn retry_and_log<F, A, Fut>(period: Duration, max_attempts: u64, phase: &'static str, f: F, arg: A)
-where
+fn retry_and_log<F, A, Fut>(
+    initial_delay: Duration,
+    retry_delay: Duration,
+    max_attempts: u64,
+    phase: &'static str,
+    f: F,
+    arg: A,
+) where
     F: FnOnce(A) -> Fut + Copy + 'static,
     A: Copy + 'static,
     Fut: Future<Output = Result<(), String>>,
 {
-    ic_cdk::spawn(async move {
-        if max_attempts == 0 {
-            ic_cdk::print(format!(
-                "ERR(retry_and_log): Exceeded max attempts {} in {}: starting from scratch.",
-                max_attempts, phase
-            ));
-            if let Err(err) = update_miner_block_cycles(0).await {
-                ic_cdk::print(format!(
-                    "ERR(retry_and_log): Could not reset miner block cycles: {}",
-                    err
-                ));
+    ic_cdk_timers::set_timer(initial_delay, move || {
+        ic_cdk::spawn(async move {
+            if let Err(err) = f(arg).await {
+                ic_cdk::print(format!("ERR({}): {}", phase, err));
+                if max_attempts == 0 {
+                    ic_cdk::print(format!(
+                        "ERR(retry_and_log): Exceeded max attempts in {}: starting from scratch.",
+                        phase
+                    ));
+                    run();
+                } else {
+                    retry_and_log(retry_delay, retry_delay, max_attempts - 1, phase, f, arg);
+                }
             }
-            if let Err(err) = check_rewards().await {
-                ic_cdk::print(format!(
-                    "ERR(retry_and_log): Failed to check rewards: {}",
-                    err
-                ));
-            }
-            run();
-        } else if let Err(err) = f(arg).await {
-            ic_cdk::print(format!("ERR({}): {}", phase, err));
-            ic_cdk_timers::set_timer(period, move || {
-                retry_and_log(period, max_attempts - 1, phase, f, arg);
-            });
-        }
+        });
     });
 }
 
@@ -180,6 +176,7 @@ async fn check_rewards() -> Result<(), String> {
     if bob_balance != 0_u128 {
         let rewards_idx = add_rewards(bob_balance);
         retry_and_log(
+            Duration::from_secs(0),
             Duration::from_secs(600),
             100,
             "rewards",
@@ -192,6 +189,7 @@ async fn check_rewards() -> Result<(), String> {
 
 fn run() {
     retry_and_log(
+        Duration::from_secs(0),
         Duration::from_secs(30),
         10,
         "schedule_stage_1",
@@ -201,6 +199,8 @@ fn run() {
 }
 
 async fn schedule_stage_1(_: ()) -> Result<(), String> {
+    update_miner_block_cycles(0).await?;
+    check_rewards().await?;
     let stats = get_bob_stats().await?;
     let time_since_last_block = stats.time_since_last_block;
     if time_since_last_block >= 490 {
@@ -210,11 +210,13 @@ async fn schedule_stage_1(_: ()) -> Result<(), String> {
             block_count, time_since_last_block
         ));
     }
-    ic_cdk_timers::set_timer(
+    retry_and_log(
         Duration::from_secs(490 - time_since_last_block),
-        move || {
-            retry_and_log(Duration::from_secs(0), 1, "stage_1", stage_1, ());
-        },
+        Duration::from_secs(0),
+        1,
+        "stage_1",
+        stage_1,
+        (),
     );
     Ok(())
 }
@@ -252,15 +254,14 @@ async fn stage_1(_: ()) -> Result<(), String> {
             )
         })?;
     commit_block_participants(next_block_participants);
-    ic_cdk_timers::set_timer(Duration::from_secs(250), move || {
-        retry_and_log(
-            Duration::from_secs(10),
-            3,
-            "stage_2",
-            stage_2,
-            total_member_block_cycles,
-        )
-    });
+    retry_and_log(
+        Duration::from_secs(250),
+        Duration::from_secs(10),
+        3,
+        "stage_2",
+        stage_2,
+        total_member_block_cycles,
+    );
     Ok(())
 }
 
@@ -272,7 +273,6 @@ async fn stage_2(total_member_block_cycles: u128) -> Result<(), String> {
             miner_stats.last_round_cyles_burned, total_member_block_cycles
         ));
     }
-    update_miner_block_cycles(0).await?;
     run();
     Ok(())
 }
@@ -383,9 +383,7 @@ fn init() {
 
 #[post_upgrade]
 async fn post_upgrade() {
-    ic_cdk_timers::set_timer(Duration::from_secs(0), move || {
-        run();
-    });
+    run();
 }
 
 #[query]
