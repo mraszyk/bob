@@ -1,11 +1,13 @@
 use bob_miner_v2::{MinerSettings, StatsV2};
 use bob_minter_v2::Stats;
 use bob_pool::guard::GuardPrincipal;
+use bob_pool::guard::TaskGuard;
 use bob_pool::memory::{
     add_member_total_cycles, add_rewards, commit_block_participants, get_miner_canister,
     get_next_block_participants, get_rewards, set_miner_canister, set_rewards,
     total_pending_rewards,
 };
+use bob_pool::TaskType;
 use bob_pool::{
     fetch_block, notify_top_up, MemberCycles, MAINNET_BOB_CANISTER_ID,
     MAINNET_BOB_LEDGER_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID,
@@ -150,6 +152,8 @@ fn retry_and_log<F, A, Fut>(
 }
 
 async fn pay_rewards(idx: u64) -> Result<(), String> {
+    let _guard_principal = TaskGuard::new(TaskType::PayRewards)
+        .map_err(|guard_error| format!("Concurrency error: {:?}", guard_error))?;
     let mut rewards = get_rewards(idx);
     let done: BTreeSet<_> = rewards
         .transfer_idx
@@ -169,6 +173,8 @@ async fn pay_rewards(idx: u64) -> Result<(), String> {
 }
 
 async fn check_rewards() -> Result<(), String> {
+    let _guard_principal = TaskGuard::new(TaskType::CheckRewards)
+        .map_err(|guard_error| format!("Concurrency error: {:?}", guard_error))?;
     let bob_balance = get_bob_balance()
         .await?
         .checked_sub(total_pending_rewards())

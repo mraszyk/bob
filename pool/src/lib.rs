@@ -41,8 +41,8 @@ pub struct Rewards {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskType {
-    ProcessLogic,
-    MineBob,
+    CheckRewards,
+    PayRewards,
 }
 
 pub async fn fetch_block(block_height: u64) -> Result<icp_ledger::Block, String> {
