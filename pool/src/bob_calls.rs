@@ -1,6 +1,6 @@
 use crate::{MAINNET_BOB_CANISTER_ID, MAINNET_BOB_LEDGER_CANISTER_ID};
 use bob_miner_v2::{MinerSettings, StatsV2};
-use bob_minter_v2::Stats;
+use bob_minter_v2::{Block, Stats};
 use candid::{Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc1::transfer::{TransferArg, TransferError};
@@ -43,17 +43,15 @@ pub async fn bob_transfer(user_id: Principal, amount: u128) -> Result<u64, Strin
         },),
     )
     .await
-    .map(|res| {
-        res.0
-            .map(|block| block.0.try_into().unwrap())
-            .map_err(|err| format!("Error from BoB ledger canister: {}", err))
-    })
     .map_err(|(code, msg)| {
         format!(
             "Error while calling BoB ledger canister ({:?}): {}",
             code, msg
         )
     })?
+    .0
+    .map(|block| block.0.try_into().unwrap())
+    .map_err(|err| format!("Error from BoB ledger canister: {}", err))
 }
 
 // BoB Canister
@@ -73,8 +71,16 @@ pub async fn spawn_miner(block_index: u64) -> Result<Principal, String> {
 pub async fn upgrade_miner(miner: Principal) -> Result<(), String> {
     ic_cdk::call::<_, (Result<(), String>,)>(MAINNET_BOB_CANISTER_ID, "upgrade_miner", (miner,))
         .await
-        .map(|res| res.0)
         .map_err(|(code, msg)| format!("Error while calling BoB canister ({:?}): {}", code, msg))?
+        .0
+        .map_err(|err| format!("Error from BoB canister: {}", err))
+}
+
+pub async fn get_latest_blocks() -> Result<Vec<Block>, String> {
+    ic_cdk::call::<_, (Vec<Block>,)>(MAINNET_BOB_CANISTER_ID, "get_latest_blocks", ((),))
+        .await
+        .map(|res| res.0)
+        .map_err(|(code, msg)| format!("Error while calling BoB canister ({:?}): {}", code, msg))
 }
 
 pub async fn get_bob_statistics() -> Result<Stats, String> {

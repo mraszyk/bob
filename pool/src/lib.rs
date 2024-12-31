@@ -1,15 +1,15 @@
 pub use crate::bob_calls::{
-    bob_transfer, get_bob_balance, get_bob_statistics, get_miner_statistics, spawn_miner,
-    update_miner_settings, upgrade_miner,
+    bob_transfer, get_bob_balance, get_bob_statistics, get_latest_blocks, get_miner_statistics,
+    spawn_miner, update_miner_settings, upgrade_miner,
 };
 pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
 pub use crate::memory::{
-    add_member_total_cycles, add_rewards, commit_block_participants, get_member_cycles,
-    get_miner_canister, get_next_block_participants, get_rewards, set_member_block_cycles,
-    set_miner_canister, set_rewards, total_pending_rewards,
+    add_member_remaining_cycles, add_rewards, commit_block_participants, get_last_reward_timestamp,
+    get_member_cycles, get_member_rewards, get_miner_canister, get_next_block_participants,
+    set_last_reward_timestamp, set_member_block_cycles, set_member_rewards, set_miner_canister,
 };
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
-pub use crate::types::{MemberCycles, Rewards};
+pub use crate::types::{MemberCycles, Reward};
 
 mod bob_calls;
 mod guard;

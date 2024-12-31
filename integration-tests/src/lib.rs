@@ -149,6 +149,35 @@ fn test_pool_not_ready() {
 }
 
 #[test]
+fn test_failed_upgrade_pool() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let pic = setup(vec![admin]);
+
+    deploy_pool(&pic, admin);
+    assert!(!is_pool_ready(&pic));
+    assert!(get_miner(&pic).is_none());
+
+    // avoid rate-limiting errors due to frequent code installation
+    for _ in 0..10 {
+        pic.tick();
+    }
+
+    let err = upgrade_pool(&pic, admin).unwrap_err();
+    match err {
+        CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
+        CallError::UserError(err) => assert!(err.description.contains("No miner found.")),
+    };
+
+    assert_eq!(pool_logs(&pic, admin).len(), 2);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Failed to init: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000\n"));
+    assert!(String::from_utf8(pool_logs(&pic, admin)[1].content.clone())
+        .unwrap()
+        .contains("No miner found."));
+}
+
+#[test]
 fn test_join_pool() {
     let admin = Principal::from_slice(&[0xFF; 29]);
     let user_1 = Principal::from_slice(&[0xFE; 29]);
@@ -206,35 +235,6 @@ fn test_upgrade_pool() {
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
         .contains("Sent BoB top up transfer at ICP ledger block index 2."));
-}
-
-#[test]
-fn test_failed_upgrade_pool() {
-    let admin = Principal::from_slice(&[0xFF; 29]);
-    let pic = setup(vec![admin]);
-
-    deploy_pool(&pic, admin);
-    assert!(!is_pool_ready(&pic));
-    assert!(get_miner(&pic).is_none());
-
-    // avoid rate-limiting errors due to frequent code installation
-    for _ in 0..10 {
-        pic.tick();
-    }
-
-    let err = upgrade_pool(&pic, admin).unwrap_err();
-    match err {
-        CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
-        CallError::UserError(err) => assert!(err.description.contains("No miner found.")),
-    };
-
-    assert_eq!(pool_logs(&pic, admin).len(), 2);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Failed to init: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000\n"));
-    assert!(String::from_utf8(pool_logs(&pic, admin)[1].content.clone())
-        .unwrap()
-        .contains("No miner found."));
 }
 
 #[test]
@@ -335,6 +335,10 @@ fn test_pool_rewards() {
     let user_2_block_cycles = 5_000_000_000_000;
     set_member_block_cycles(&pic, user_2, user_2_block_cycles).unwrap();
 
+    let member_cycles_admin = get_member_cycles(&pic, admin).unwrap();
+    let member_cycles_user_1 = get_member_cycles(&pic, user_1).unwrap();
+    let member_cycles_user_2 = get_member_cycles(&pic, user_2).unwrap();
+
     let num_blocks = 5;
     for _ in 0..num_blocks {
         mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
@@ -350,9 +354,9 @@ fn test_pool_rewards() {
     assert_eq!(blocks.len(), num_blocks + 1);
     let total_block_cycles = admin_block_cycles + user_1_block_cycles + user_2_block_cycles;
     for block in blocks.iter().take(num_blocks - 1) {
-        assert!(block.total_cycles_burned.unwrap() as u128 >= total_block_cycles);
         assert!(
-            block.total_cycles_burned.unwrap() as u128 <= total_block_cycles + 2 * miner_cycles
+            (total_block_cycles + miner_cycles..=total_block_cycles + 2 * miner_cycles)
+                .contains(&(block.total_cycles_burned.unwrap() as u128))
         );
     }
 
@@ -370,6 +374,29 @@ fn test_pool_rewards() {
         bob_balance(&pic, user_2) as u128,
         (60_000_000_000 - 3_000_000) * user_2_block_cycles * (num_blocks - 1) as u128
             / total_block_cycles
+    );
+
+    let max_pool_fee = 5_000_000_000;
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, admin_block_cycles);
+    assert_eq!(member_cycles.pending, admin_block_cycles);
+    assert_eq!(
+        member_cycles.remaining + (admin_block_cycles + max_pool_fee / 3) * (num_blocks as u128),
+        member_cycles_admin.remaining
+    );
+    let member_cycles = get_member_cycles(&pic, user_1).unwrap();
+    assert_eq!(member_cycles.block, user_1_block_cycles);
+    assert_eq!(member_cycles.pending, user_1_block_cycles);
+    assert_eq!(
+        member_cycles.remaining + (user_1_block_cycles + max_pool_fee / 3) * (num_blocks as u128),
+        member_cycles_user_1.remaining
+    );
+    let member_cycles = get_member_cycles(&pic, user_2).unwrap();
+    assert_eq!(member_cycles.block, user_2_block_cycles);
+    assert_eq!(member_cycles.pending, user_2_block_cycles);
+    assert_eq!(
+        member_cycles.remaining + (user_2_block_cycles + max_pool_fee / 3) * (num_blocks as u128),
+        member_cycles_user_2.remaining
     );
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);

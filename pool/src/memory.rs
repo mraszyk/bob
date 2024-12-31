@@ -1,9 +1,10 @@
-use crate::{MemberCycles, Rewards};
+use crate::{MemberCycles, Reward};
 use candid::{Nat, Principal};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{DefaultMemoryImpl as DefMem, StableBTreeMap, StableCell, Storable};
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::RefCell;
 
@@ -29,11 +30,17 @@ where
     const BOUND: Bound = Bound::Unbounded;
 }
 
+#[derive(Clone, Copy, Default, Deserialize, Serialize)]
+struct State {
+    pub miner: Option<Principal>,
+    pub last_reward_timestamp: u64,
+}
+
 // NOTE: ensure that all memory ids are unique and
 // do not change across upgrades!
-const MINER_CANISTER_MEM_ID: MemoryId = MemoryId::new(0);
+const POOL_STATE_MEM_ID: MemoryId = MemoryId::new(0);
 const MEMBER_TO_CYCLES_MEM_ID: MemoryId = MemoryId::new(1);
-const REWARDS_MEM_ID: MemoryId = MemoryId::new(2);
+const MEMBER_TO_REWARDS_MEM_ID: MemoryId = MemoryId::new(2);
 
 type VM = VirtualMemory<DefMem>;
 
@@ -42,9 +49,9 @@ thread_local! {
         MM::init(DefaultMemoryImpl::default())
     );
 
-    static MINER_CANISTER: RefCell<StableCell<Option<Principal>, VM>> =
+    static POOL_STATE: RefCell<StableCell<Cbor<State>, VM>> =
         MEMORY_MANAGER.with(|mm| {
-        RefCell::new(StableCell::init(mm.borrow().get(MINER_CANISTER_MEM_ID), None).unwrap())
+        RefCell::new(StableCell::init(mm.borrow().get(POOL_STATE_MEM_ID), Cbor(State::default())).unwrap())
     });
 
     static MEMBER_TO_CYCLES: RefCell<StableBTreeMap<Principal, Cbor<MemberCycles>, VM>> =
@@ -52,21 +59,37 @@ thread_local! {
         RefCell::new(StableBTreeMap::init(mm.borrow().get(MEMBER_TO_CYCLES_MEM_ID)))
     });
 
-    static REWARDS: RefCell<StableBTreeMap<u64, Cbor<Rewards>, VM>> =
+    static MEMBER_TO_REWARDS: RefCell<StableBTreeMap<Principal, Cbor<Vec<Reward>>, VM>> =
         MEMORY_MANAGER.with(|mm| {
-        RefCell::new(StableBTreeMap::init(mm.borrow().get(REWARDS_MEM_ID)))
+        RefCell::new(StableBTreeMap::init(mm.borrow().get(MEMBER_TO_REWARDS_MEM_ID)))
     });
 }
 
 pub fn get_miner_canister() -> Option<Principal> {
-    MINER_CANISTER.with(|s| *s.borrow().get())
+    POOL_STATE.with(|s| s.borrow().get().0.miner)
 }
 
-pub fn set_miner_canister(bob_miner_canister: Principal) {
-    let _ = MINER_CANISTER.with(|s| s.borrow_mut().set(Some(bob_miner_canister)).unwrap());
+pub fn set_miner_canister(miner: Principal) {
+    POOL_STATE.with(|s| {
+        let mut state = s.borrow().get().0;
+        state.miner = Some(miner);
+        s.borrow_mut().set(Cbor(state)).unwrap();
+    });
 }
 
-pub fn add_member_total_cycles(member: Principal, new_cycles: u128) {
+pub fn get_last_reward_timestamp() -> u64 {
+    POOL_STATE.with(|s| s.borrow().get().0.last_reward_timestamp)
+}
+
+pub fn set_last_reward_timestamp(last_reward_timestamp: u64) {
+    POOL_STATE.with(|s| {
+        let mut state = s.borrow().get().0;
+        state.last_reward_timestamp = last_reward_timestamp;
+        s.borrow_mut().set(Cbor(state)).unwrap();
+    });
+}
+
+pub fn add_member_remaining_cycles(member: Principal, new_cycles: u128) {
     MEMBER_TO_CYCLES.with(|s| {
         let mut member_cycles = s.borrow().get(&member).unwrap_or_default();
         member_cycles.0.remaining += new_cycles;
@@ -114,58 +137,67 @@ pub fn commit_block_participants(participants: Vec<(Principal, u128)>) {
     });
 }
 
-pub fn add_rewards(total_bob: u128) -> u64 {
-    let num_beneficiaries = MEMBER_TO_CYCLES.with(|s| {
-        s.borrow()
-            .iter()
-            .filter(|(_, mc)| mc.0.pending != 0_u64)
-            .count()
-    });
-    let total_bob_fee = num_beneficiaries.checked_mul(1_000_000).unwrap() as u128;
-    let distribute_bob = total_bob.checked_sub(total_bob_fee).unwrap();
-    let total_cycles = MEMBER_TO_CYCLES.with(|s| {
-        s.borrow()
-            .iter()
-            .map(|(_, mc)| {
-                let pending: u128 = mc.0.pending.0.try_into().unwrap();
-                pending
-            })
-            .sum::<u128>()
-    });
-    let participants: Vec<(Principal, u128)> = MEMBER_TO_CYCLES.with(|s| {
+pub fn add_rewards(total_bob_brutto: u128) -> Vec<Principal> {
+    let participants: Vec<_> = MEMBER_TO_CYCLES.with(|s| {
         s.borrow()
             .iter()
             .filter_map(|(member, mc)| {
                 if mc.0.pending != 0_u64 {
-                    let pending: u128 = mc.0.pending.0.try_into().unwrap();
-                    Some((member, distribute_bob * pending / total_cycles))
+                    Some(member)
                 } else {
                     None
                 }
             })
             .collect()
     });
-    let rewards = Cbor(Rewards {
-        total_amount: total_bob,
-        pending: participants.iter().map(|(_, amount)| amount).sum::<u128>() + total_bob_fee,
-        participants,
-        transfer_idx: vec![],
+    let num_participants = participants.len() as u128;
+    let total_bob_fee = num_participants.checked_mul(1_000_000).unwrap();
+    let total_bob_netto = total_bob_brutto.checked_sub(total_bob_fee).unwrap();
+    let total_pending_cycles = MEMBER_TO_CYCLES.with(|s| {
+        s.borrow()
+            .iter()
+            .map(|(_, mc)| {
+                let pending_cycles: u128 = mc.0.pending.0.try_into().unwrap();
+                pending_cycles
+            })
+            .sum::<u128>()
     });
-    REWARDS.with(|s| {
-        let n = s.borrow().len();
-        s.borrow_mut().insert(n, rewards);
-        n
-    })
+    MEMBER_TO_CYCLES.with(|s| {
+        for (member, mc) in s.borrow().iter() {
+            if mc.0.pending != 0_u64 {
+                let pending_cycles: u128 = mc.0.pending.0.try_into().unwrap();
+                let bob_reward = total_bob_netto
+                    .checked_mul(pending_cycles)
+                    .unwrap()
+                    .checked_div(total_pending_cycles)
+                    .unwrap();
+                MEMBER_TO_REWARDS.with(|s| {
+                    let mut rewards = s.borrow().get(&member).unwrap().0;
+                    rewards.push(Reward {
+                        timestamp: ic_cdk::api::time(),
+                        cycles_burnt: pending_cycles,
+                        bob_reward,
+                        bob_block_index: None,
+                    });
+                    s.borrow_mut().insert(member, Cbor(rewards));
+                });
+            }
+        }
+    });
+    MEMBER_TO_CYCLES.with(|s| {
+        for member in participants.iter() {
+            let mut mc = s.borrow().get(member).unwrap().0;
+            mc.pending = 0_u64.into();
+            s.borrow_mut().insert(*member, Cbor(mc));
+        }
+    });
+    participants
 }
 
-pub fn total_pending_rewards() -> u128 {
-    REWARDS.with(|s| s.borrow().iter().map(|(_, r)| r.0.pending).sum())
+pub fn get_member_rewards(member: Principal) -> Vec<Reward> {
+    MEMBER_TO_REWARDS.with(|s| s.borrow().get(&member).map(|r| r.0).unwrap_or_default())
 }
 
-pub fn get_rewards(idx: u64) -> Rewards {
-    REWARDS.with(|s| s.borrow().get(&idx).unwrap().0)
-}
-
-pub fn set_rewards(idx: u64, rewards: Rewards) {
-    REWARDS.with(|s| s.borrow_mut().insert(idx, Cbor(rewards)));
+pub fn set_member_rewards(member: Principal, rewards: Vec<Reward>) {
+    MEMBER_TO_REWARDS.with(|s| s.borrow_mut().insert(member, Cbor(rewards)));
 }

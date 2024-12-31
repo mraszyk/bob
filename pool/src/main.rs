@@ -1,10 +1,10 @@
 use bob_pool::{
-    add_member_total_cycles, add_rewards, bob_transfer, commit_block_participants, fetch_block,
-    get_bob_balance, get_bob_statistics, get_miner_canister, get_miner_statistics,
-    get_next_block_participants, get_rewards, notify_top_up, set_miner_canister, set_rewards,
-    spawn_miner, total_pending_rewards, transfer, update_miner_settings, upgrade_miner,
-    GuardPrincipal, MemberCycles, TaskGuard, TaskType, MAINNET_BOB_CANISTER_ID,
-    MAINNET_CYCLE_MINTER_CANISTER_ID,
+    add_member_remaining_cycles, add_rewards, bob_transfer, commit_block_participants, fetch_block,
+    get_bob_statistics, get_last_reward_timestamp, get_latest_blocks, get_member_rewards,
+    get_miner_canister, get_miner_statistics, get_next_block_participants, notify_top_up,
+    set_last_reward_timestamp, set_member_rewards, set_miner_canister, spawn_miner, transfer,
+    update_miner_settings, upgrade_miner, GuardPrincipal, MemberCycles, TaskGuard, TaskType,
+    MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::{Nat, Principal};
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
@@ -12,7 +12,7 @@ use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
 use ic_cdk::{init, inspect_message, post_upgrade, query, trap, update};
 use icp_ledger::{AccountIdentifier, Operation, Subaccount};
-use std::collections::BTreeSet;
+use std::cmp::max;
 use std::future::Future;
 use std::time::Duration;
 
@@ -69,44 +69,47 @@ fn retry_and_log<F, A, Fut>(
     });
 }
 
-async fn pay_rewards(idx: u64) -> Result<(), String> {
+async fn pay_rewards(member: Principal) -> Result<(), String> {
     let _guard_principal = TaskGuard::new(TaskType::PayRewards)
         .map_err(|guard_error| format!("Concurrency error: {:?}", guard_error))?;
-    let mut rewards = get_rewards(idx);
-    let done: BTreeSet<_> = rewards
-        .transfer_idx
-        .iter()
-        .map(|(member, _)| member)
-        .cloned()
-        .collect();
-    for (member, amount) in rewards.participants.clone().into_iter() {
-        if !done.contains(&member) {
-            let block_idx = bob_transfer(member, amount).await?;
-            rewards.pending = rewards.pending.checked_sub(amount + 1_000_000).unwrap();
-            rewards.transfer_idx.push((member, block_idx));
-            set_rewards(idx, rewards.clone());
+    let mut rewards = get_member_rewards(member);
+    for reward in &mut rewards {
+        if reward.bob_block_index.is_none() {
+            if let Ok(block_idx) = bob_transfer(member, reward.bob_reward).await {
+                reward.bob_block_index = Some(block_idx);
+            }
         }
     }
+    set_member_rewards(member, rewards);
     Ok(())
 }
 
 async fn check_rewards() -> Result<(), String> {
     let _guard_principal = TaskGuard::new(TaskType::CheckRewards)
         .map_err(|guard_error| format!("Concurrency error: {:?}", guard_error))?;
-    let bob_balance = get_bob_balance()
-        .await?
-        .checked_sub(total_pending_rewards())
-        .unwrap();
-    if bob_balance != 0_u128 {
-        let rewards_idx = add_rewards(bob_balance);
-        retry_and_log(
-            Duration::from_secs(0),
-            Duration::from_secs(600),
-            100,
-            "rewards",
-            pay_rewards,
-            rewards_idx,
-        );
+    let latest_blocks = get_latest_blocks().await?;
+    let mut total_bob_rewards: u128 = 0;
+    let last_reward_timestamp = get_last_reward_timestamp();
+    let mut max_reward_timestamp = 0;
+    for block in latest_blocks {
+        if block.to == ic_cdk::id() && block.timestamp > last_reward_timestamp {
+            total_bob_rewards = total_bob_rewards.checked_add(block.rewards.into()).unwrap();
+            max_reward_timestamp = max(max_reward_timestamp, block.timestamp);
+        }
+    }
+    if total_bob_rewards > 0 {
+        let participants = add_rewards(total_bob_rewards);
+        ic_cdk_timers::set_timer(Duration::from_secs(0), move || {
+            ic_cdk::spawn(async move {
+                for participant in participants {
+                    if let Err(err) = pay_rewards(participant).await {
+                        ic_cdk::print(format!("ERR(pay_rewards): {}", err));
+                    }
+                }
+            });
+        });
+        assert_ne!(max_reward_timestamp, 0);
+        set_last_reward_timestamp(max_reward_timestamp);
     }
     Ok(())
 }
@@ -336,7 +339,8 @@ async fn join_pool(block_index: u64) -> Result<(), String> {
         }
 
         let res = notify_top_up(block_index).await?;
-        add_member_total_cycles(caller, res.get());
+        add_member_remaining_cycles(caller, res.get());
+        set_member_rewards(caller, vec![]);
 
         Ok(())
     } else {

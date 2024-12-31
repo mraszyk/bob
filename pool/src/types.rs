@@ -1,4 +1,4 @@
-use candid::{CandidType, Nat, Principal};
+use candid::{CandidType, Nat};
 use serde::{Deserialize, Serialize};
 
 #[derive(CandidType, Debug, Default, Serialize, Deserialize)]
@@ -9,9 +9,9 @@ pub struct MemberCycles {
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct Rewards {
-    pub total_amount: u128,
-    pub pending: u128,
-    pub participants: Vec<(Principal, u128)>,
-    pub transfer_idx: Vec<(Principal, u64)>,
+pub struct Reward {
+    pub timestamp: u64,
+    pub cycles_burnt: u128,
+    pub bob_reward: u128,
+    pub bob_block_index: Option<u64>,
 }

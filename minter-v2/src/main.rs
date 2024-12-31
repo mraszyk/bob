@@ -76,6 +76,9 @@ fn filter_out_known_index(indices: Vec<u64>) -> Vec<u64> {
 
 #[query]
 fn get_latest_blocks() -> Vec<Block> {
+    if mined_block_count() == 0 {
+        return vec![];
+    }
     let mut result: Vec<Block> = vec![];
     let mut max_index = mined_block_count().checked_sub(1).unwrap();
     while result.len() < 10 {
