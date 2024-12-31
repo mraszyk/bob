@@ -227,13 +227,25 @@ fn test_set_member_block_cycles() {
     assert!(
         err.contains("The number of block cycles 100_000_000_001 is not a multiple of 1_000_000.")
     );
-
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.block, 100_000_000_000_u128);
 
-    set_member_block_cycles(&pic, admin, 10_000_000_000_u128).unwrap();
+    set_member_block_cycles(&pic, admin, 15_000_000_000_u128).unwrap();
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
-    assert_eq!(member_cycles.block, 10_000_000_000_u128);
+    assert_eq!(member_cycles.block, 15_000_000_000_u128);
+
+    let err = set_member_block_cycles(&pic, admin, 14_000_000_000_u128).unwrap_err();
+    assert!(err.contains("The number of block cycles 14_000_000_000 is too small."));
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, 15_000_000_000_u128);
+
+    set_member_block_cycles(&pic, admin, 0_u128).unwrap();
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, 0_u128);
+
+    set_member_block_cycles(&pic, admin, 15_000_000_000_u128).unwrap();
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, 15_000_000_000_u128);
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
