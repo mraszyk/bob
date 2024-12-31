@@ -177,7 +177,7 @@ fn test_join_pool() {
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
-        .contains("Sent BoB top up transfer at block index 4."));
+        .contains("Sent BoB top up transfer at ICP ledger block index 4."));
 }
 
 #[test]
@@ -205,7 +205,7 @@ fn test_upgrade_pool() {
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
-        .contains("Sent BoB top up transfer at block index 2."));
+        .contains("Sent BoB top up transfer at ICP ledger block index 2."));
 }
 
 #[test]
@@ -279,7 +279,7 @@ fn test_set_member_block_cycles() {
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
-        .contains("Sent BoB top up transfer at block index 2."));
+        .contains("Sent BoB top up transfer at ICP ledger block index 2."));
 }
 
 #[test]
@@ -305,7 +305,7 @@ fn test_pool_inactive_by_default() {
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
-        .contains("Sent BoB top up transfer at block index 3."));
+        .contains("Sent BoB top up transfer at ICP ledger block index 3."));
 }
 
 #[test]
@@ -375,5 +375,5 @@ fn test_pool_rewards() {
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
-        .contains("Sent BoB top up transfer at block index 7."));
+        .contains("Sent BoB top up transfer at ICP ledger block index 7."));
 }

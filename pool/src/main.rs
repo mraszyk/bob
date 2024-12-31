@@ -213,7 +213,7 @@ async fn do_init() -> Result<Principal, String> {
     )
     .await?;
     ic_cdk::print(format!(
-        "Sent BoB top up transfer at block index {}.",
+        "Sent BoB top up transfer at ICP ledger block index {}.",
         block_index
     ));
 
