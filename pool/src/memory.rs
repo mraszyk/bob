@@ -69,7 +69,7 @@ pub fn set_miner_canister(bob_miner_canister: Principal) {
 pub fn add_member_total_cycles(member: Principal, new_cycles: u128) {
     MEMBER_TO_CYCLES.with(|s| {
         let mut member_cycles = s.borrow().get(&member).unwrap_or_default();
-        member_cycles.0.total += new_cycles;
+        member_cycles.0.remaining += new_cycles;
         s.borrow_mut().insert(member, member_cycles)
     });
 }
@@ -91,7 +91,7 @@ pub fn get_next_block_participants() -> Vec<(Principal, u128)> {
         s.borrow()
             .iter()
             .filter_map(|(member, mc)| {
-                if mc.0.block.clone() + 5_000_000_000_u64 <= mc.0.total {
+                if mc.0.block.clone() + 5_000_000_000_u64 <= mc.0.remaining {
                     let block_cycles: u128 = mc.0.block.0.try_into().unwrap();
                     Some((member, block_cycles))
                 } else {
@@ -107,7 +107,7 @@ pub fn commit_block_participants(participants: Vec<(Principal, u128)>) {
     MEMBER_TO_CYCLES.with(|s| {
         for (member, block_cycles) in participants {
             let mut mc = s.borrow().get(&member).unwrap().0;
-            mc.total -= block_cycles + fee;
+            mc.remaining -= block_cycles + fee;
             mc.pending += block_cycles;
             s.borrow_mut().insert(member, Cbor(mc));
         }

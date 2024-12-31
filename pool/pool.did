@@ -1,7 +1,7 @@
 type MemberCycles = record {
-  total : nat;
-  pending : nat;
   block : nat;
+  pending : nat;
+  remaining : nat;
 };
 type MemberCyclesResult = variant {
   Ok : opt MemberCycles;

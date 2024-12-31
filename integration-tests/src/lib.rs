@@ -166,12 +166,12 @@ fn test_join_pool() {
         assert!(get_member_cycles(&pic, user).is_none());
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
-        assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
         assert_eq!(member_cycles.block, 0_u64);
+        assert_eq!(member_cycles.remaining, 7_800_000_000_000_u64);
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
-        assert_eq!(member_cycles.total, 2 * 7_800_000_000_000_u64);
         assert_eq!(member_cycles.block, 0_u64);
+        assert_eq!(member_cycles.remaining, 2 * 7_800_000_000_000_u64);
     }
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
@@ -192,15 +192,15 @@ fn test_upgrade_pool() {
     join_pool(&pic, admin, 100_000_000).unwrap();
     set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap();
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
-    assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
     assert_eq!(member_cycles.block, 100_000_000_000_u64);
+    assert_eq!(member_cycles.remaining, 7_800_000_000_000_u64);
 
     upgrade_pool(&pic, admin).unwrap();
     assert!(is_pool_ready(&pic));
     assert_eq!(get_miner(&pic).unwrap(), bob_miner);
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
-    assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
     assert_eq!(member_cycles.block, 100_000_000_000_u64);
+    assert_eq!(member_cycles.remaining, 7_800_000_000_000_u64);
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())

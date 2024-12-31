@@ -26,9 +26,9 @@ pub mod memory;
 
 #[derive(CandidType, Debug, Default, Serialize, Deserialize)]
 pub struct MemberCycles {
-    pub total: Nat,
     pub block: Nat,
     pub pending: Nat,
+    pub remaining: Nat,
 }
 
 #[derive(CandidType, Clone, Debug, Default, Serialize, Deserialize)]
