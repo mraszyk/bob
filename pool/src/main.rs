@@ -1,24 +1,18 @@
 use bob_miner_v2::{MinerSettings, StatsV2};
 use bob_minter_v2::Stats;
-use bob_pool::guard::GuardPrincipal;
-use bob_pool::guard::{TaskGuard, TaskType};
-use bob_pool::memory::{
-    add_member_total_cycles, add_rewards, commit_block_participants, get_miner_canister,
-    get_next_block_participants, get_rewards, set_miner_canister, set_rewards,
-    total_pending_rewards,
-};
 use bob_pool::{
-    fetch_block, notify_top_up, MemberCycles, MAINNET_BOB_CANISTER_ID,
-    MAINNET_BOB_LEDGER_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID,
-    MAINNET_LEDGER_INDEX_CANISTER_ID,
+    add_member_total_cycles, add_rewards, commit_block_participants, fetch_block,
+    get_miner_canister, get_next_block_participants, get_rewards, notify_top_up,
+    set_miner_canister, set_rewards, total_pending_rewards, transfer, GuardPrincipal, MemberCycles,
+    TaskGuard, TaskType, MAINNET_BOB_CANISTER_ID, MAINNET_BOB_LEDGER_CANISTER_ID,
+    MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::{Nat, Principal};
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
 use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
 use ic_cdk::{init, inspect_message, post_upgrade, query, trap, update};
-use ic_ledger_types::TransferResult;
-use icp_ledger::{AccountIdentifier, Memo, Operation, Subaccount, Tokens, TransferArgs};
+use icp_ledger::{AccountIdentifier, Operation, Subaccount};
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc1::transfer::{TransferArg, TransferError};
 use std::collections::BTreeSet;
@@ -283,59 +277,20 @@ async fn stage_2(total_member_block_cycles: u128) -> Result<(), String> {
 }
 
 async fn transfer_topup_bob(amount: u64) -> Result<u64, String> {
-    let sub = Subaccount::from(&ic_types::PrincipalId(MAINNET_BOB_CANISTER_ID));
-    let to = AccountIdentifier::new(
-        ic_types::PrincipalId(MAINNET_CYCLE_MINTER_CANISTER_ID),
-        Some(sub),
-    );
-    let transfer_args = TransferArgs {
-        memo: Memo(1347768404),
-        amount: Tokens::from_e8s(amount),
-        from_subaccount: None,
-        fee: Tokens::from_e8s(10_000),
-        to: to.to_address(),
-        created_at_time: None,
-    };
-    let block_index = ic_cdk::call::<_, (TransferResult,)>(
-        MAINNET_LEDGER_CANISTER_ID,
-        "transfer",
-        (transfer_args,),
+    let block_index = transfer(
+        MAINNET_CYCLE_MINTER_CANISTER_ID,
+        Some(MAINNET_BOB_CANISTER_ID),
+        1347768404,
+        amount,
     )
-    .await
-    .map_err(|(code, msg)| {
-        format!(
-            "Error while calling ICP ledger canister ({:?}): {}",
-            code, msg
-        )
-    })?
-    .0
-    .map_err(|err| format!("Error from ICP ledger canister: {}", err))?;
+    .await?;
     ic_cdk::print(format!(
         "Sent BoB top up transfer at block index {}.",
         block_index
     ));
-    let get_blocks_args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {
-        start: block_index.into(),
-        length: Nat::from(1_u8),
-    };
-    loop {
-        let blocks_raw = ic_cdk::call::<_, (ic_icp_index::GetBlocksResponse,)>(
-            MAINNET_LEDGER_INDEX_CANISTER_ID,
-            "get_blocks",
-            (get_blocks_args.clone(),),
-        )
-        .await
-        .map_err(|(code, msg)| {
-            format!(
-                "Error while calling ICP index canister ({:?}): {}",
-                code, msg
-            )
-        })?
-        .0;
-        if blocks_raw.blocks.first().is_some() {
-            break;
-        }
-    }
+
+    while fetch_block(block_index).await.is_err() {}
+
     Ok(block_index)
 }
 
@@ -408,14 +363,14 @@ fn ensure_ready() -> Result<(), String> {
 #[query]
 fn get_member_cycles() -> Result<Option<MemberCycles>, String> {
     ensure_ready()?;
-    Ok(bob_pool::memory::get_member_cycles(ic_cdk::caller()))
+    Ok(bob_pool::get_member_cycles(ic_cdk::caller()))
 }
 
 #[update]
 fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
     ensure_ready()?;
     let caller = ic_cdk::caller();
-    if bob_pool::memory::get_member_cycles(caller).is_none() {
+    if bob_pool::get_member_cycles(caller).is_none() {
         return Err(format!("The caller {} is no pool member.", caller));
     }
     if block_cycles.clone() != 0_u64 && block_cycles.clone() < 15_000_000_000_u64 {
@@ -430,7 +385,7 @@ fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
             block_cycles
         ));
     }
-    bob_pool::memory::set_member_block_cycles(caller, block_cycles);
+    bob_pool::set_member_block_cycles(caller, block_cycles);
     Ok(())
 }
 
