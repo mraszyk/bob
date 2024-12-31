@@ -1,8 +1,8 @@
+use crate::guard::TaskType;
 use candid::{CandidType, Nat, Principal};
 use cycles_minting_canister::NotifyError;
 use ic_ledger_core::block::BlockType;
 use ic_types::Cycles;
-use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
@@ -23,27 +23,9 @@ pub const MAINNET_CYCLE_MINTER_CANISTER_ID: Principal =
 
 pub mod guard;
 pub mod memory;
+mod types;
 
-#[derive(CandidType, Debug, Default, Serialize, Deserialize)]
-pub struct MemberCycles {
-    pub block: Nat,
-    pub pending: Nat,
-    pub remaining: Nat,
-}
-
-#[derive(CandidType, Clone, Debug, Default, Serialize, Deserialize)]
-pub struct Rewards {
-    pub total_amount: u128,
-    pub pending: u128,
-    pub participants: Vec<(Principal, u128)>,
-    pub transfer_idx: Vec<(Principal, u64)>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum TaskType {
-    CheckRewards,
-    PayRewards,
-}
+pub use crate::types::*;
 
 pub async fn fetch_block(block_height: u64) -> Result<icp_ledger::Block, String> {
     let args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {

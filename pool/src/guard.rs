@@ -1,6 +1,6 @@
-use crate::{mutate_state, TaskType};
-use candid::{CandidType, Deserialize, Principal};
-use serde::Serialize;
+use crate::mutate_state;
+use candid::{CandidType, Principal};
+use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 const MAX_CONCURRENT: usize = 100;
@@ -42,13 +42,19 @@ impl Drop for GuardPrincipal {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum TaskGuardError {
-    AlreadyProcessing,
+pub struct TaskGuard {
+    task: TaskType,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TaskType {
+    CheckRewards,
+    PayRewards,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct TaskGuard {
-    task: TaskType,
+pub enum TaskGuardError {
+    AlreadyProcessing,
 }
 
 impl TaskGuard {
