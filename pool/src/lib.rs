@@ -1,3 +1,7 @@
+pub use crate::bob_calls::{
+    bob_transfer, get_bob_balance, get_bob_statistics, get_miner_statistics, spawn_miner,
+    update_miner_settings, upgrade_miner,
+};
 pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
 pub use crate::memory::{
     add_member_total_cycles, add_rewards, commit_block_participants, get_member_cycles,
@@ -7,6 +11,7 @@ pub use crate::memory::{
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
 pub use crate::types::{MemberCycles, Rewards};
 
+mod bob_calls;
 mod guard;
 mod memory;
 mod system_calls;

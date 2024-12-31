@@ -8,7 +8,7 @@ use ic_ledger_types::TransferResult;
 use ic_types::Cycles;
 use icp_ledger::{AccountIdentifier, Memo, Subaccount, Tokens, TransferArgs};
 
-// ICP Ledger
+// ICP Ledger Canister
 
 pub async fn transfer(
     account_principal: Principal,
@@ -40,7 +40,7 @@ pub async fn transfer(
         .map_err(|err| format!("Error from ICP ledger canister: {}", err))
 }
 
-// ICP Index
+// ICP Index Canister
 
 pub async fn fetch_block(block_height: u64) -> Result<icp_ledger::Block, String> {
     let args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {

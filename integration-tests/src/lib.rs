@@ -145,7 +145,7 @@ fn test_pool_not_ready() {
     assert!(err.contains("BoB pool canister is not ready; please try again later."));
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone()).unwrap().contains("[TRAP]: Could not top up BoB: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000"));
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone()).unwrap().contains("[TRAP]: Failed to init: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000"));
 }
 
 #[test]
@@ -231,7 +231,7 @@ fn test_failed_upgrade_pool() {
     assert_eq!(pool_logs(&pic, admin).len(), 2);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
-        .contains("Could not top up BoB: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000\n"));
+        .contains("Failed to init: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000\n"));
     assert!(String::from_utf8(pool_logs(&pic, admin)[1].content.clone())
         .unwrap()
         .contains("No miner found."));
