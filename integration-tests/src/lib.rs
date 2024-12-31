@@ -12,7 +12,7 @@ use crate::utils::{
 };
 use bob_pool::MemberCycles;
 use candid::Principal;
-use pocket_ic::{query_candid_as, update_candid_as};
+use pocket_ic::{query_candid_as, update_candid_as, CallError};
 
 // System canister IDs
 
@@ -195,7 +195,7 @@ fn test_upgrade_pool() {
     assert_eq!(member_cycles.total, 7_800_000_000_000_u64);
     assert_eq!(member_cycles.block, 100_000_000_000_u64);
 
-    upgrade_pool(&pic, admin);
+    upgrade_pool(&pic, admin).unwrap();
     assert!(is_pool_ready(&pic));
     assert_eq!(get_miner(&pic).unwrap(), bob_miner);
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
@@ -206,6 +206,35 @@ fn test_upgrade_pool() {
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
         .contains("Sent BoB top up transfer at block index 2."));
+}
+
+#[test]
+fn test_failed_upgrade_pool() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let pic = setup(vec![admin]);
+
+    deploy_pool(&pic, admin);
+    assert!(!is_pool_ready(&pic));
+    assert!(get_miner(&pic).is_none());
+
+    // avoid rate-limiting errors due to frequent code installation
+    for _ in 0..10 {
+        pic.tick();
+    }
+
+    let err = upgrade_pool(&pic, admin).unwrap_err();
+    match err {
+        CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
+        CallError::UserError(err) => assert!(err.description.contains("No miner found.")),
+    };
+
+    assert_eq!(pool_logs(&pic, admin).len(), 2);
+    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Could not top up BoB: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000\n"));
+    assert!(String::from_utf8(pool_logs(&pic, admin)[1].content.clone())
+        .unwrap()
+        .contains("No miner found."));
 }
 
 #[test]

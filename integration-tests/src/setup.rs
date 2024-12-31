@@ -8,7 +8,7 @@ use ic_icrc1_ledger::{InitArgsBuilder, LedgerArgument};
 use ic_ledger_types::Tokens;
 use ic_ledger_types::{AccountIdentifier, DEFAULT_SUBACCOUNT};
 use icrc_ledger_types::icrc1::account::Account;
-use pocket_ic::{update_candid_as, PocketIc, PocketIcBuilder};
+use pocket_ic::{update_candid_as, CallError, PocketIc, PocketIcBuilder};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
@@ -258,7 +258,7 @@ pub(crate) fn deploy_ready_pool(pic: &PocketIc, admin: Principal) {
     }
 }
 
-pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) {
+pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) -> Result<(), CallError> {
     let bob_pool_canister_wasm = get_canister_wasm("bob-pool").to_vec();
     pic.upgrade_canister(
         BOB_POOL_CANISTER_ID,
@@ -266,5 +266,4 @@ pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) {
         Encode!(&()).unwrap(),
         Some(admin),
     )
-    .unwrap();
 }

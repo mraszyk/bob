@@ -389,6 +389,9 @@ fn init() {
 
 #[post_upgrade]
 async fn post_upgrade() {
+    if get_miner().is_none() {
+        trap("No miner found.");
+    }
     run();
 }
 
