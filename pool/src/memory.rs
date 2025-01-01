@@ -1,5 +1,5 @@
 use crate::{MemberCycles, Reward};
-use candid::{Nat, Principal};
+use candid::Principal;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::DefaultMemoryImpl;
 use ic_stable_structures::{DefaultMemoryImpl as DefMem, StableBTreeMap, StableCell};
@@ -78,7 +78,7 @@ pub fn add_member_remaining_cycles(member: Principal, new_cycles: u128) {
     });
 }
 
-pub fn set_member_block_cycles(member: Principal, block_cycles: Nat) {
+pub fn set_member_block_cycles(member: Principal, block_cycles: u128) {
     MEMBER_TO_CYCLES.with(|s| {
         let mut member_cycles = s.borrow().get(&member).unwrap_or_default();
         member_cycles.block = block_cycles;
@@ -95,9 +95,8 @@ pub fn get_next_block_participants() -> Vec<(Principal, u128)> {
         s.borrow()
             .iter()
             .filter_map(|(member, mc)| {
-                if mc.block.clone() + 5_000_000_000_u64 <= mc.remaining {
-                    let block_cycles: u128 = mc.block.0.try_into().unwrap();
-                    Some((member, block_cycles))
+                if mc.block + 5_000_000_000 <= mc.remaining {
+                    Some((member, mc.block))
                 } else {
                     None
                 }
@@ -122,31 +121,26 @@ pub fn add_rewards(total_bob_brutto: u128) {
     let participants: Vec<_> = MEMBER_TO_CYCLES.with(|s| {
         s.borrow()
             .iter()
-            .filter_map(|(member, mc)| {
-                if mc.pending != 0_u64 {
-                    Some(member)
-                } else {
-                    None
-                }
-            })
+            .filter_map(
+                |(member, mc)| {
+                    if mc.pending != 0 {
+                        Some(member)
+                    } else {
+                        None
+                    }
+                },
+            )
             .collect()
     });
     let num_participants = participants.len() as u128;
     let total_bob_fee = num_participants.checked_mul(1_000_000).unwrap();
     let total_bob_netto = total_bob_brutto.checked_sub(total_bob_fee).unwrap();
-    let total_pending_cycles = MEMBER_TO_CYCLES.with(|s| {
-        s.borrow()
-            .iter()
-            .map(|(_, mc)| {
-                let pending_cycles: u128 = mc.pending.0.try_into().unwrap();
-                pending_cycles
-            })
-            .sum::<u128>()
-    });
+    let total_pending_cycles =
+        MEMBER_TO_CYCLES.with(|s| s.borrow().iter().map(|(_, mc)| mc.pending).sum());
     MEMBER_TO_CYCLES.with(|s| {
         for (member, mc) in s.borrow().iter() {
-            if mc.pending != 0_u64 {
-                let pending_cycles: u128 = mc.pending.0.try_into().unwrap();
+            if mc.pending != 0 {
+                let pending_cycles = mc.pending;
                 let bob_reward = total_bob_netto
                     .checked_mul(pending_cycles)
                     .unwrap()
@@ -168,7 +162,7 @@ pub fn add_rewards(total_bob_brutto: u128) {
     MEMBER_TO_CYCLES.with(|s| {
         for member in participants.iter() {
             let mut mc = s.borrow().get(member).unwrap();
-            mc.pending = 0_u64.into();
+            mc.pending = 0;
             s.borrow_mut().insert(*member, mc);
         }
     });

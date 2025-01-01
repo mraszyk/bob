@@ -1,7 +1,7 @@
 use crate::{
     MAINNET_CYCLE_MINTER_CANISTER_ID, MAINNET_LEDGER_CANISTER_ID, MAINNET_LEDGER_INDEX_CANISTER_ID,
 };
-use candid::{CandidType, Nat, Principal};
+use candid::{CandidType, Principal};
 use cycles_minting_canister::NotifyError;
 use ic_ledger_core::block::BlockType;
 use ic_ledger_types::TransferResult;
@@ -45,7 +45,7 @@ pub async fn transfer(
 pub async fn fetch_block(block_height: u64) -> Result<icp_ledger::Block, String> {
     let args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {
         start: block_height.into(),
-        length: Nat::from(1_u8),
+        length: 1_u64.into(),
     };
 
     let res = ic_cdk::api::call::call::<_, (ic_icp_index::GetBlocksResponse,)>(

@@ -6,7 +6,7 @@ use bob_pool::{
     update_miner_settings, upgrade_miner, GuardPrincipal, MemberCycles, Reward, TaskGuard,
     TaskType, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
-use candid::{Nat, Principal};
+use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
 use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
@@ -256,22 +256,22 @@ fn get_member_cycles() -> Result<Option<MemberCycles>, String> {
 }
 
 #[update]
-fn set_member_block_cycles(block_cycles: Nat) -> Result<(), String> {
+fn set_member_block_cycles(block_cycles: u128) -> Result<(), String> {
     ensure_ready()?;
     let caller = ic_cdk::caller();
     if bob_pool::get_member_cycles(caller).is_none() {
         return Err(format!("The caller {} is no pool member.", caller));
     }
-    if block_cycles.clone() != 0_u64 && block_cycles.clone() < 15_000_000_000_u64 {
+    if block_cycles != 0 && block_cycles < 15_000_000_000 {
         return Err(format!(
             "The number of block cycles {} is too small.",
             block_cycles
         ));
     }
-    if block_cycles.clone() % 1_000_000_u64 != 0_u64 {
+    if block_cycles % 1_000_000 != 0 {
         return Err(format!(
-            "The number of block cycles {} is not a multiple of 1_000_000.",
-            block_cycles
+            "The number of block cycles {} is not a multiple of {}.",
+            block_cycles, 1000000_u128
         ));
     }
     bob_pool::set_member_block_cycles(caller, block_cycles);
@@ -320,7 +320,7 @@ async fn join_pool(block_index: u64) -> Result<(), String> {
                 to, expect_to
             ));
         }
-        let min_amount = icp_ledger::Tokens::from_e8s(99_990_000_u64);
+        let min_amount = icp_ledger::Tokens::from_e8s(99_990_000);
         if amount < min_amount {
             return Err(format!(
                 "Transaction amount ({}) too low: should be at least {}.",

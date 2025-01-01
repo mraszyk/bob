@@ -1,12 +1,12 @@
-use candid::{CandidType, Nat};
+use candid::CandidType;
 use orbit_essentials_macros::storable;
 
 #[derive(CandidType, Debug, Default)]
 #[storable]
 pub struct MemberCycles {
-    pub block: Nat,
-    pub pending: Nat,
-    pub remaining: Nat,
+    pub block: u128,
+    pub pending: u128,
+    pub remaining: u128,
 }
 
 #[derive(CandidType, Clone, Debug)]

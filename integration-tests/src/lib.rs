@@ -195,12 +195,12 @@ fn test_join_pool() {
         assert!(get_member_cycles(&pic, user).is_none());
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
-        assert_eq!(member_cycles.block, 0_u64);
-        assert_eq!(member_cycles.remaining, 7_800_000_000_000_u64);
+        assert_eq!(member_cycles.block, 0);
+        assert_eq!(member_cycles.remaining, 7_800_000_000_000);
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
-        assert_eq!(member_cycles.block, 0_u64);
-        assert_eq!(member_cycles.remaining, 2 * 7_800_000_000_000_u64);
+        assert_eq!(member_cycles.block, 0);
+        assert_eq!(member_cycles.remaining, 2 * 7_800_000_000_000);
     }
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
@@ -221,15 +221,15 @@ fn test_upgrade_pool() {
     join_pool(&pic, admin, 100_000_000).unwrap();
     set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap();
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
-    assert_eq!(member_cycles.block, 100_000_000_000_u64);
-    assert_eq!(member_cycles.remaining, 7_800_000_000_000_u64);
+    assert_eq!(member_cycles.block, 100_000_000_000);
+    assert_eq!(member_cycles.remaining, 7_800_000_000_000);
 
     upgrade_pool(&pic, admin).unwrap();
     assert!(is_pool_ready(&pic));
     assert_eq!(get_miner(&pic).unwrap(), bob_miner);
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
-    assert_eq!(member_cycles.block, 100_000_000_000_u64);
-    assert_eq!(member_cycles.remaining, 7_800_000_000_000_u64);
+    assert_eq!(member_cycles.block, 100_000_000_000);
+    assert_eq!(member_cycles.remaining, 7_800_000_000_000);
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
@@ -253,9 +253,7 @@ fn test_set_member_block_cycles() {
     set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap();
 
     let err = set_member_block_cycles(&pic, admin, 100_000_000_001_u128).unwrap_err();
-    assert!(
-        err.contains("The number of block cycles 100_000_000_001 is not a multiple of 1_000_000.")
-    );
+    assert!(err.contains("The number of block cycles 100000000001 is not a multiple of 1000000."));
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.block, 100_000_000_000_u128);
 
@@ -264,7 +262,7 @@ fn test_set_member_block_cycles() {
     assert_eq!(member_cycles.block, 15_000_000_000_u128);
 
     let err = set_member_block_cycles(&pic, admin, 14_000_000_000_u128).unwrap_err();
-    assert!(err.contains("The number of block cycles 14_000_000_000 is too small."));
+    assert!(err.contains("The number of block cycles 14000000000 is too small."));
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.block, 15_000_000_000_u128);
 
@@ -377,7 +375,7 @@ fn test_pool_rewards() {
     let max_pool_fee = 5_000_000_000;
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.block, admin_block_cycles);
-    assert_eq!(member_cycles.pending, 0_u64);
+    assert_eq!(member_cycles.pending, 0);
     assert_eq!(
         member_cycles.remaining
             + (admin_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
@@ -385,7 +383,7 @@ fn test_pool_rewards() {
     );
     let member_cycles = get_member_cycles(&pic, user_1).unwrap();
     assert_eq!(member_cycles.block, user_1_block_cycles);
-    assert_eq!(member_cycles.pending, 0_u64);
+    assert_eq!(member_cycles.pending, 0);
     assert_eq!(
         member_cycles.remaining
             + (user_1_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
@@ -393,7 +391,7 @@ fn test_pool_rewards() {
     );
     let member_cycles = get_member_cycles(&pic, user_2).unwrap();
     assert_eq!(member_cycles.block, user_2_block_cycles);
-    assert_eq!(member_cycles.pending, 0_u64);
+    assert_eq!(member_cycles.pending, 0);
     assert_eq!(
         member_cycles.remaining
             + (user_2_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
