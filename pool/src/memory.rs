@@ -137,7 +137,7 @@ pub fn commit_block_participants(participants: Vec<(Principal, u128)>) {
     });
 }
 
-pub fn add_rewards(total_bob_brutto: u128) -> Vec<Principal> {
+pub fn add_rewards(total_bob_brutto: u128) {
     let participants: Vec<_> = MEMBER_TO_CYCLES.with(|s| {
         s.borrow()
             .iter()
@@ -191,7 +191,6 @@ pub fn add_rewards(total_bob_brutto: u128) -> Vec<Principal> {
             s.borrow_mut().insert(*member, Cbor(mc));
         }
     });
-    participants
 }
 
 pub fn get_member_rewards(member: Principal) -> Vec<Reward> {

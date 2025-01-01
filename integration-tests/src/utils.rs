@@ -4,7 +4,7 @@ use crate::{
 };
 use bob_miner_v2::MinerSettings;
 use bob_minter_v2::{Block, Stats};
-use bob_pool::MemberCycles;
+use bob_pool::{MemberCycles, Reward};
 use candid::{Nat, Principal};
 use ic_ledger_core::block::BlockType;
 use ic_ledger_types::{
@@ -280,4 +280,37 @@ pub(crate) fn update_miner_block_cycles(
         ((miner_settings_args),),
     )
     .unwrap();
+}
+
+pub(crate) fn get_member_rewards(pic: &PocketIc, user_id: Principal) -> Vec<Reward> {
+    query_candid_as::<_, (Vec<Reward>,)>(
+        pic,
+        BOB_POOL_CANISTER_ID,
+        user_id,
+        "get_member_rewards",
+        ((),),
+    )
+    .unwrap()
+    .0
+}
+
+pub(crate) fn pay_member_rewards(pic: &PocketIc, user_id: Principal) {
+    update_candid_as::<_, (Result<(), String>,)>(
+        pic,
+        BOB_POOL_CANISTER_ID,
+        user_id,
+        "pay_member_rewards",
+        ((),),
+    )
+    .unwrap()
+    .0
+    .unwrap();
+}
+
+pub(crate) fn ensure_member_rewards(pic: &PocketIc, user_id: Principal, num_rewards: usize) {
+    while get_member_rewards(pic, user_id).len() < num_rewards {
+        pic.advance_time(std::time::Duration::from_secs(1));
+        pic.tick();
+    }
+    pay_member_rewards(pic, user_id);
 }

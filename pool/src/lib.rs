@@ -8,12 +8,14 @@ pub use crate::memory::{
     get_member_cycles, get_member_rewards, get_miner_canister, get_next_block_participants,
     set_last_reward_timestamp, set_member_block_cycles, set_member_rewards, set_miner_canister,
 };
+pub use crate::rewards::pay_rewards;
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
 pub use crate::types::{MemberCycles, Reward};
 
 mod bob_calls;
 mod guard;
 mod memory;
+mod rewards;
 mod system_calls;
 mod types;
 

@@ -5,10 +5,10 @@ mod utils;
 
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
-    bob_balance, get_latest_blocks, get_member_cycles, get_miner, is_pool_ready, join_native_pool,
-    join_pool, mine_block, mine_block_with_round_length, pool_logs, set_member_block_cycles,
-    spawn_miner, transfer_to_principal, transfer_topup_pool, update_miner_block_cycles,
-    upgrade_miner,
+    bob_balance, ensure_member_rewards, get_latest_blocks, get_member_cycles, get_miner,
+    is_pool_ready, join_native_pool, join_pool, mine_block, mine_block_with_round_length,
+    pool_logs, set_member_block_cycles, spawn_miner, transfer_to_principal, transfer_topup_pool,
+    update_miner_block_cycles, upgrade_miner,
 };
 use bob_pool::MemberCycles;
 use candid::Principal;
@@ -344,11 +344,9 @@ fn test_pool_rewards() {
         mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
     }
 
-    // wait for BoB transfers
-    for _ in 0..100 {
-        pic.advance_time(std::time::Duration::from_secs(1));
-        pic.tick();
-    }
+    ensure_member_rewards(&pic, admin, num_blocks - 1);
+    ensure_member_rewards(&pic, user_1, num_blocks - 1);
+    ensure_member_rewards(&pic, user_2, num_blocks - 1);
 
     let blocks = get_latest_blocks(&pic);
     assert_eq!(blocks.len(), num_blocks + 1);
@@ -379,23 +377,26 @@ fn test_pool_rewards() {
     let max_pool_fee = 5_000_000_000;
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.block, admin_block_cycles);
-    assert_eq!(member_cycles.pending, admin_block_cycles);
+    assert_eq!(member_cycles.pending, 0_u64);
     assert_eq!(
-        member_cycles.remaining + (admin_block_cycles + max_pool_fee / 3) * (num_blocks as u128),
+        member_cycles.remaining
+            + (admin_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
         member_cycles_admin.remaining
     );
     let member_cycles = get_member_cycles(&pic, user_1).unwrap();
     assert_eq!(member_cycles.block, user_1_block_cycles);
-    assert_eq!(member_cycles.pending, user_1_block_cycles);
+    assert_eq!(member_cycles.pending, 0_u64);
     assert_eq!(
-        member_cycles.remaining + (user_1_block_cycles + max_pool_fee / 3) * (num_blocks as u128),
+        member_cycles.remaining
+            + (user_1_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
         member_cycles_user_1.remaining
     );
     let member_cycles = get_member_cycles(&pic, user_2).unwrap();
     assert_eq!(member_cycles.block, user_2_block_cycles);
-    assert_eq!(member_cycles.pending, user_2_block_cycles);
+    assert_eq!(member_cycles.pending, 0_u64);
     assert_eq!(
-        member_cycles.remaining + (user_2_block_cycles + max_pool_fee / 3) * (num_blocks as u128),
+        member_cycles.remaining
+            + (user_2_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
         member_cycles_user_2.remaining
     );
 

@@ -7,10 +7,18 @@ type MemberCyclesResult = variant {
   Ok : opt MemberCycles;
   Err : text;
 };
+type MemberReward = record {
+  timestamp : nat64;
+  cycles_burnt : nat;
+  bob_reward : nat;
+  bob_block_index : opt nat64;
+};
 type Result = variant { Ok; Err : text };
 service : () -> {
   get_miner : () -> (opt principal) query;
   get_member_cycles : () -> (MemberCyclesResult) query;
+  get_member_rewards : () -> (vec MemberReward) query;
   join_pool : (nat64) -> (Result);
+  pay_member_rewards : () -> (Result);
   set_member_block_cycles : (nat) -> (Result);
 }

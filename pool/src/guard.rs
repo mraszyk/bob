@@ -49,7 +49,6 @@ pub struct TaskGuard {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskType {
     CheckRewards,
-    PayRewards,
 }
 
 #[derive(Debug, PartialEq, Eq)]
