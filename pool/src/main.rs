@@ -56,12 +56,12 @@ fn retry_and_log<F, A, Fut>(
         ic_cdk::spawn(async move {
             if let Err(err) = f(arg).await {
                 ic_cdk::print(format!("ERR({}): {}", phase, err));
-                if max_attempts == 0 {
+                if max_attempts == 1 {
                     ic_cdk::print(format!(
                         "ERR(retry_and_log): Exceeded max attempts in {}: starting from scratch.",
                         phase
                     ));
-                    run();
+                    run(retry_delay);
                 } else {
                     retry_and_log(retry_delay, retry_delay, max_attempts - 1, phase, f, arg);
                 }
@@ -70,50 +70,52 @@ fn retry_and_log<F, A, Fut>(
     });
 }
 
-fn run() {
-    retry_and_log(
-        Duration::from_secs(0),
-        Duration::from_secs(30),
-        10,
-        "schedule_stage_1",
-        schedule_stage_1,
-        (),
-    );
+fn run(delay: Duration) {
+    retry_and_log(delay, Duration::from_secs(0), 1, "stage_1", stage_1, ());
 }
 
-async fn schedule_stage_1(_: ()) -> Result<(), String> {
+async fn stage_1(_: ()) -> Result<(), String> {
     let miner = get_miner().unwrap();
     update_miner_settings(miner, Some(0), None).await?;
     check_rewards().await?;
     let stats = get_bob_statistics().await?;
     let time_since_last_block = stats.time_since_last_block;
-    if time_since_last_block >= 490 {
+    if time_since_last_block < 120 {
+        retry_and_log(
+            Duration::from_secs(0),
+            Duration::from_secs(0),
+            1,
+            "stage_2",
+            stage_2,
+            (),
+        );
+    } else if time_since_last_block >= 490 {
         let block_count = stats.block_count;
         return Err(format!(
             "Time since last block {} too high: {}",
             block_count, time_since_last_block
         ));
+    } else {
+        retry_and_log(
+            Duration::from_secs(490 - time_since_last_block),
+            Duration::from_secs(0),
+            1,
+            "stage_1",
+            stage_1,
+            (),
+        );
     }
-    retry_and_log(
-        Duration::from_secs(490 - time_since_last_block),
-        Duration::from_secs(0),
-        1,
-        "stage_1",
-        stage_1,
-        (),
-    );
     Ok(())
 }
 
-async fn stage_1(_: ()) -> Result<(), String> {
-    check_rewards().await?;
+async fn stage_2(_: ()) -> Result<(), String> {
     let next_block_participants = get_next_block_participants();
     let total_member_block_cycles = next_block_participants
         .iter()
         .map(|(_, block_cycles)| block_cycles)
         .sum();
     if total_member_block_cycles == 0 {
-        run();
+        run(Duration::from_secs(60));
         return Ok(());
     }
     let miner = get_miner().unwrap();
@@ -143,14 +145,14 @@ async fn stage_1(_: ()) -> Result<(), String> {
         Duration::from_secs(250),
         Duration::from_secs(10),
         3,
-        "stage_2",
-        stage_2,
+        "stage_3",
+        stage_3,
         total_member_block_cycles,
     );
     Ok(())
 }
 
-async fn stage_2(total_member_block_cycles: u128) -> Result<(), String> {
+async fn stage_3(total_member_block_cycles: u128) -> Result<(), String> {
     let miner = get_miner().unwrap();
     let miner_stats = get_miner_statistics(miner).await?;
     if miner_stats.last_round_cyles_burned != total_member_block_cycles {
@@ -159,7 +161,7 @@ async fn stage_2(total_member_block_cycles: u128) -> Result<(), String> {
             miner_stats.last_round_cyles_burned, total_member_block_cycles
         ));
     }
-    run();
+    run(Duration::from_secs(0));
     Ok(())
 }
 
@@ -191,7 +193,7 @@ fn init() {
                 .await
                 .unwrap_or_else(|err| trap(&format!("Failed to init: {}", err)));
             set_miner_canister(miner);
-            run();
+            run(Duration::from_secs(0));
         })
     });
 }
@@ -201,7 +203,7 @@ fn post_upgrade() {
     if get_miner().is_none() {
         trap("No miner found.");
     }
-    run();
+    run(Duration::from_secs(0));
 }
 
 #[query]

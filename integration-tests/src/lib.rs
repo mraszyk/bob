@@ -294,11 +294,17 @@ fn test_pool_inactive_by_default() {
     let miner_cycles = 50_000_000_000;
     update_miner_block_cycles(&pic, user, miner, miner_cycles);
 
-    mine_block(&pic);
+    let num_blocks = 3;
+    for _ in 0..num_blocks {
+        mine_block(&pic);
+    }
 
     let blocks = get_latest_blocks(&pic);
-    assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].total_cycles_burned.unwrap() as u128, miner_cycles);
+    assert_eq!(blocks.len(), num_blocks);
+    for block in blocks {
+        assert!((miner_cycles..=2 * miner_cycles)
+            .contains(&(block.total_cycles_burned.unwrap() as u128)));
+    }
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
@@ -337,19 +343,19 @@ fn test_pool_rewards() {
     let member_cycles_user_1 = get_member_cycles(&pic, user_1).unwrap();
     let member_cycles_user_2 = get_member_cycles(&pic, user_2).unwrap();
 
-    let num_blocks = 5;
+    let num_blocks = 3;
     for _ in 0..num_blocks {
         mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
     }
 
-    ensure_member_rewards(&pic, admin, num_blocks - 1);
-    ensure_member_rewards(&pic, user_1, num_blocks - 1);
-    ensure_member_rewards(&pic, user_2, num_blocks - 1);
+    ensure_member_rewards(&pic, admin, num_blocks);
+    ensure_member_rewards(&pic, user_1, num_blocks);
+    ensure_member_rewards(&pic, user_2, num_blocks);
 
     let blocks = get_latest_blocks(&pic);
     assert_eq!(blocks.len(), num_blocks + 1);
     let total_block_cycles = admin_block_cycles + user_1_block_cycles + user_2_block_cycles;
-    for block in blocks.iter().take(num_blocks - 1) {
+    for block in blocks.iter().take(num_blocks) {
         assert!(
             (total_block_cycles + miner_cycles..=total_block_cycles + 2 * miner_cycles)
                 .contains(&(block.total_cycles_burned.unwrap() as u128))
@@ -358,17 +364,16 @@ fn test_pool_rewards() {
 
     assert_eq!(
         bob_balance(&pic, admin) as u128,
-        (60_000_000_000 - 3_000_000) * admin_block_cycles * (num_blocks - 1) as u128
-            / total_block_cycles
+        (60_000_000_000 - 3_000_000) * admin_block_cycles * num_blocks as u128 / total_block_cycles
     );
     assert_eq!(
         bob_balance(&pic, user_1) as u128,
-        (60_000_000_000 - 3_000_000) * user_1_block_cycles * (num_blocks - 1) as u128
+        (60_000_000_000 - 3_000_000) * user_1_block_cycles * num_blocks as u128
             / total_block_cycles
     );
     assert_eq!(
         bob_balance(&pic, user_2) as u128,
-        (60_000_000_000 - 3_000_000) * user_2_block_cycles * (num_blocks - 1) as u128
+        (60_000_000_000 - 3_000_000) * user_2_block_cycles * num_blocks as u128
             / total_block_cycles
     );
 
@@ -377,24 +382,21 @@ fn test_pool_rewards() {
     assert_eq!(member_cycles.block, admin_block_cycles);
     assert_eq!(member_cycles.pending, 0);
     assert_eq!(
-        member_cycles.remaining
-            + (admin_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
+        member_cycles.remaining + (admin_block_cycles + max_pool_fee / 3) * num_blocks as u128,
         member_cycles_admin.remaining
     );
     let member_cycles = get_member_cycles(&pic, user_1).unwrap();
     assert_eq!(member_cycles.block, user_1_block_cycles);
     assert_eq!(member_cycles.pending, 0);
     assert_eq!(
-        member_cycles.remaining
-            + (user_1_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
+        member_cycles.remaining + (user_1_block_cycles + max_pool_fee / 3) * num_blocks as u128,
         member_cycles_user_1.remaining
     );
     let member_cycles = get_member_cycles(&pic, user_2).unwrap();
     assert_eq!(member_cycles.block, user_2_block_cycles);
     assert_eq!(member_cycles.pending, 0);
     assert_eq!(
-        member_cycles.remaining
-            + (user_2_block_cycles + max_pool_fee / 3) * (num_blocks as u128 - 1),
+        member_cycles.remaining + (user_2_block_cycles + max_pool_fee / 3) * num_blocks as u128,
         member_cycles_user_2.remaining
     );
 
