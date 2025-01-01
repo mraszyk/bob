@@ -1,10 +1,9 @@
 use bob_pool::{
-    add_member_remaining_cycles, add_rewards, commit_block_participants, fetch_block,
-    get_bob_statistics, get_last_reward_timestamp, get_latest_blocks, get_miner_canister,
-    get_miner_statistics, get_next_block_participants, notify_top_up, pay_rewards,
-    set_last_reward_timestamp, set_member_rewards, set_miner_canister, spawn_miner, transfer,
-    update_miner_settings, upgrade_miner, GuardPrincipal, MemberCycles, Reward, TaskGuard,
-    TaskType, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
+    add_member_remaining_cycles, check_rewards, commit_block_participants, fetch_block,
+    get_bob_statistics, get_miner_canister, get_miner_statistics, get_next_block_participants,
+    notify_top_up, pay_rewards, set_member_rewards, set_miner_canister, spawn_miner, transfer,
+    update_miner_settings, upgrade_miner, GuardPrincipal, MemberCycles, Reward,
+    MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
@@ -12,7 +11,6 @@ use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
 use ic_cdk::{init, inspect_message, post_upgrade, query, trap, update};
 use icp_ledger::{AccountIdentifier, Operation, Subaccount};
-use std::cmp::max;
 use std::future::Future;
 use std::time::Duration;
 
@@ -70,27 +68,6 @@ fn retry_and_log<F, A, Fut>(
             }
         });
     });
-}
-
-async fn check_rewards() -> Result<(), String> {
-    let _guard_principal = TaskGuard::new(TaskType::CheckRewards)
-        .map_err(|guard_error| format!("Concurrency error: {:?}", guard_error))?;
-    let latest_blocks = get_latest_blocks().await?;
-    let mut total_bob_rewards: u128 = 0;
-    let last_reward_timestamp = get_last_reward_timestamp();
-    let mut max_reward_timestamp = 0;
-    for block in latest_blocks {
-        if block.to == ic_cdk::id() && block.timestamp > last_reward_timestamp {
-            total_bob_rewards = total_bob_rewards.checked_add(block.rewards.into()).unwrap();
-            max_reward_timestamp = max(max_reward_timestamp, block.timestamp);
-        }
-    }
-    if total_bob_rewards > 0 {
-        add_rewards(total_bob_rewards);
-        assert_ne!(max_reward_timestamp, 0);
-        set_last_reward_timestamp(max_reward_timestamp);
-    }
-    Ok(())
 }
 
 fn run() {

@@ -4,11 +4,12 @@ pub use crate::bob_calls::{
 };
 pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
 pub use crate::memory::{
-    add_member_remaining_cycles, add_rewards, commit_block_participants, get_last_reward_timestamp,
-    get_member_cycles, get_member_rewards, get_miner_canister, get_next_block_participants,
+    add_member_remaining_cycles, commit_block_participants, get_last_reward_timestamp,
+    get_member_cycles, get_member_rewards, get_member_to_pending_cycles, get_miner_canister,
+    get_next_block_participants, push_member_rewards, reset_member_pending_cycles,
     set_last_reward_timestamp, set_member_block_cycles, set_member_rewards, set_miner_canister,
 };
-pub use crate::rewards::pay_rewards;
+pub use crate::rewards::{check_rewards, pay_rewards};
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
 pub use crate::types::{MemberCycles, Reward};
 
@@ -22,6 +23,8 @@ mod types;
 use candid::Principal;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
+
+pub const BOB_POOL_BLOCK_FEE: u128 = 5_000_000_000;
 
 pub const MAINNET_BOB_CANISTER_ID: Principal =
     Principal::from_slice(&[0x00, 0x00, 0x00, 0x00, 0x02, 0x40, 0x00, 0x55, 0x01, 0x01]);
