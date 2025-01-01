@@ -276,13 +276,10 @@ dependencies = [
  "icp-ledger",
  "icrc-ledger-client-cdk",
  "icrc-ledger-types",
- "orbit-essentials",
- "orbit-essentials-macros",
  "rand",
  "rand_chacha",
  "scopeguard",
  "serde",
- "serde_cbor",
  "serde_json",
 ]
 
@@ -1127,7 +1124,7 @@ dependencies = [
  "fnv",
  "futures-core",
  "futures-sink",
- "http 1.2.0",
+ "http",
  "indexmap 2.6.0",
  "slab",
  "tokio",
@@ -1198,17 +1195,6 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "601cbb57e577e2f5ef5be8e7b83f0f63994f25aa94d673e54a92d5c516d101f1"
-dependencies = [
- "bytes",
- "fnv",
- "itoa",
-]
-
-[[package]]
-name = "http"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f16ca2af56261c99fba8bac40a10251ce8188205a4c448fbb745a2e4daa76fea"
@@ -1225,7 +1211,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1efedce1fb8e6913f23e0c92de8e62cd5b772a67e7b3946df930a62566c93184"
 dependencies = [
  "bytes",
- "http 1.2.0",
+ "http",
 ]
 
 [[package]]
@@ -1236,7 +1222,7 @@ checksum = "793429d76616a256bcb62c2a2ec2bed781c8307e797e2598c50010f2bee2544f"
 dependencies = [
  "bytes",
  "futures-util",
- "http 1.2.0",
+ "http",
  "http-body",
  "pin-project-lite",
 ]
@@ -1257,7 +1243,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "h2",
- "http 1.2.0",
+ "http",
  "http-body",
  "httparse",
  "itoa",
@@ -1274,7 +1260,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d191583f3da1305256f22463b9bb0471acad48a4e534a5218b9963e9c1f59b2"
 dependencies = [
  "futures-util",
- "http 1.2.0",
+ "http",
  "hyper",
  "hyper-util",
  "rustls",
@@ -1295,7 +1281,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-util",
- "http 1.2.0",
+ "http",
  "http-body",
  "hyper",
  "pin-project-lite",
@@ -1537,20 +1523,6 @@ dependencies = [
 
 [[package]]
 name = "ic-cdk-timers"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61fdca8e1d9ffb65ae68019b342c182009de9dc206fd849db0b0e90ee19f6fa4"
-dependencies = [
- "futures",
- "ic-cdk 0.15.1",
- "ic0 0.23.0",
- "serde",
- "serde_bytes",
- "slotmap",
-]
-
-[[package]]
-name = "ic-cdk-timers"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb8fd812a9e26f6aa00594546f8fbf4d4853f39c3ba794c8ff11ecf86fd3c9e4"
@@ -1568,17 +1540,6 @@ name = "ic-certification"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e64ee3d8b6e81b51f245716d3e0badb63c283c00f3c9fb5d5219afc30b5bf821"
-dependencies = [
- "hex",
- "serde",
- "serde_bytes",
- "sha2",
-]
-
-[[package]]
-name = "ic-certification"
-version = "2.6.0"
-source = "git+https://github.com/dfinity/response-verification?rev=da70db93832f88ecc556ae082612aedec47d3816#da70db93832f88ecc556ae082612aedec47d3816"
 dependencies = [
  "hex",
  "serde",
@@ -1661,20 +1622,6 @@ dependencies = [
  "serde",
  "strum",
  "strum_macros",
-]
-
-[[package]]
-name = "ic-http-certification"
-version = "2.6.0"
-source = "git+https://github.com/dfinity/response-verification?rev=da70db93832f88ecc556ae082612aedec47d3816#da70db93832f88ecc556ae082612aedec47d3816"
-dependencies = [
- "candid",
- "http 0.2.12",
- "ic-certification 2.6.0 (git+https://github.com/dfinity/response-verification?rev=da70db93832f88ecc556ae082612aedec47d3816)",
- "ic-representation-independent-hash",
- "serde",
- "thiserror 1.0.69",
- "urlencoding",
 ]
 
 [[package]]
@@ -1770,7 +1717,7 @@ dependencies = [
  "ic-cdk 0.16.0",
  "ic-cdk-macros 0.9.0",
  "ic-cdk-timers 0.7.0",
- "ic-certification 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic-certification",
  "ic-crypto-tree-hash",
  "ic-icrc1",
  "ic-icrc1-tokens-u64",
@@ -2026,15 +1973,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ic-representation-independent-hash"
-version = "2.6.0"
-source = "git+https://github.com/dfinity/response-verification?rev=da70db93832f88ecc556ae082612aedec47d3816#da70db93832f88ecc556ae082612aedec47d3816"
-dependencies = [
- "leb128",
- "sha2",
-]
-
-[[package]]
 name = "ic-stable-structures"
 version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2051,7 +1989,7 @@ checksum = "875dc4704780383112e8e8b5063a1b98de114321d0c7d3e7f635dcf360a57fba"
 dependencies = [
  "candid",
  "hex",
- "ic-certification 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic-certification",
  "leb128",
  "serde",
  "serde_bytes",
@@ -2816,45 +2754,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
-name = "orbit-essentials"
-version = "0.1.0"
-source = "git+https://github.com/dfinity/orbit?tag=@orbit/station-api-v0.3.0#eaf4c9a43172ca92df1a24d4e1cb3b3ebf7f02b7"
-dependencies = [
- "base64 0.22.1",
- "candid",
- "convert_case 0.6.0",
- "getrandom",
- "hex",
- "ic-cdk 0.16.0",
- "ic-cdk-timers 0.9.0",
- "ic-certification 2.6.0 (git+https://github.com/dfinity/response-verification?rev=da70db93832f88ecc556ae082612aedec47d3816)",
- "ic-http-certification",
- "ic-representation-independent-hash",
- "ic-stable-structures",
- "orbit-essentials-macros",
- "prometheus",
- "rand_chacha",
- "serde",
- "serde_bytes",
- "serde_cbor",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "time",
- "uuid",
-]
-
-[[package]]
-name = "orbit-essentials-macros"
-version = "0.1.0"
-source = "git+https://github.com/dfinity/orbit?tag=@orbit/station-api-v0.3.0#eaf4c9a43172ca92df1a24d4e1cb3b3ebf7f02b7"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.89",
-]
-
-[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3003,7 +2902,7 @@ dependencies = [
  "base64 0.13.1",
  "candid",
  "hex",
- "ic-certification 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ic-certification",
  "ic-transport-types",
  "reqwest",
  "schemars",
@@ -3150,21 +3049,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prometheus"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d33c28a30771f7f96db69893f78b857f7450d7e0237e9c8fc6427a81bae7ed1"
-dependencies = [
- "cfg-if",
- "fnv",
- "lazy_static",
- "memchr",
- "parking_lot",
- "protobuf",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "prost"
 version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3186,12 +3070,6 @@ dependencies = [
  "quote",
  "syn 2.0.89",
 ]
-
-[[package]]
-name = "protobuf"
-version = "2.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "psm"
@@ -3404,7 +3282,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "h2",
- "http 1.2.0",
+ "http",
  "http-body",
  "http-body-util",
  "hyper",
@@ -4461,12 +4339,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "urlencoding"
-version = "2.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
-
-[[package]]
 name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4489,10 +4361,6 @@ name = "uuid"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8c5f0a0af699448548ad1a2fbf920fb4bee257eae39953ba95cb84891a0446a"
-dependencies = [
- "getrandom",
- "serde",
-]
 
 [[package]]
 name = "valuable"
