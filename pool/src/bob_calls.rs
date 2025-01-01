@@ -7,25 +7,6 @@ use icrc_ledger_types::icrc1::transfer::{TransferArg, TransferError};
 
 // BoB Ledger Canister
 
-pub async fn get_bob_balance() -> Result<u128, String> {
-    ic_cdk::call::<_, (Nat,)>(
-        MAINNET_BOB_LEDGER_CANISTER_ID,
-        "icrc1_balance_of",
-        (Account {
-            owner: ic_cdk::id(),
-            subaccount: None,
-        },),
-    )
-    .await
-    .map(|res| res.0 .0.try_into().unwrap())
-    .map_err(|(code, msg)| {
-        format!(
-            "Error while calling BoB ledger canister ({:?}): {}",
-            code, msg
-        )
-    })
-}
-
 pub async fn bob_transfer(user_id: Principal, amount: u128) -> Result<u64, String> {
     ic_cdk::call::<_, (Result<Nat, TransferError>,)>(
         MAINNET_BOB_LEDGER_CANISTER_ID,

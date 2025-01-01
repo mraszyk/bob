@@ -1,6 +1,6 @@
 pub use crate::bob_calls::{
-    bob_transfer, get_bob_balance, get_bob_statistics, get_latest_blocks, get_miner_statistics,
-    spawn_miner, update_miner_settings, upgrade_miner,
+    bob_transfer, get_bob_statistics, get_latest_blocks, get_miner_statistics, spawn_miner,
+    update_miner_settings, upgrade_miner,
 };
 pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
 pub use crate::memory::{
