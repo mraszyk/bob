@@ -1,6 +1,6 @@
 use bob_pool::{
-    add_member_remaining_cycles, check_rewards, commit_block_participants, fetch_block,
-    get_bob_statistics, get_miner_canister, get_miner_statistics, get_next_block_participants,
+    add_member_remaining_cycles, check_rewards, commit_block_members, fetch_block,
+    get_bob_statistics, get_miner_canister, get_miner_statistics, get_next_block_members,
     notify_top_up, pay_rewards, set_member_rewards, set_miner_canister, spawn_miner, transfer,
     update_miner_settings, upgrade_miner, GuardPrincipal, MemberCycles, Reward,
     MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
@@ -109,8 +109,8 @@ async fn stage_1(_: ()) -> Result<(), String> {
 }
 
 async fn stage_2(_: ()) -> Result<(), String> {
-    let next_block_participants = get_next_block_participants();
-    let total_member_block_cycles = next_block_participants
+    let next_block_members = get_next_block_members();
+    let total_member_block_cycles = next_block_members
         .iter()
         .map(|(_, block_cycles)| block_cycles)
         .sum();
@@ -140,7 +140,7 @@ async fn stage_2(_: ()) -> Result<(), String> {
                 code, msg
             )
         })?;
-    commit_block_participants(next_block_participants);
+    commit_block_members(next_block_members);
     retry_and_log(
         Duration::from_secs(250),
         Duration::from_secs(10),

@@ -109,7 +109,7 @@ pub fn get_member_cycles(member: Principal) -> Option<MemberCycles> {
     MEMBER_TO_CYCLES.with(|s| s.borrow().get(&member).map(|mc| mc.0))
 }
 
-pub fn get_next_block_participants() -> Vec<(Principal, u128)> {
+pub fn get_next_block_members() -> Vec<(Principal, u128)> {
     MEMBER_TO_CYCLES.with(|s| {
         s.borrow()
             .iter()
@@ -124,10 +124,10 @@ pub fn get_next_block_participants() -> Vec<(Principal, u128)> {
     })
 }
 
-pub fn commit_block_participants(participants: Vec<(Principal, u128)>) {
-    let per_member_fee = BOB_POOL_BLOCK_FEE / (participants.len() as u128);
+pub fn commit_block_members(members: Vec<(Principal, u128)>) {
+    let per_member_fee = BOB_POOL_BLOCK_FEE / (members.len() as u128);
     MEMBER_TO_CYCLES.with(|s| {
-        for (member, block_cycles) in participants {
+        for (member, block_cycles) in members {
             let mut mc = s.borrow().get(&member).unwrap();
             mc.0.remaining =
                 mc.0.remaining
