@@ -25,8 +25,11 @@ icrc-ledger-types = { workspace = true }
 ic-ledger-core = { workspace = true }
 icp-ledger = { workspace = true }
 ic-icp-index = { workspace = true }
+orbit-essentials = { workspace = true }
+orbit-essentials-macros = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 scopeguard = { workspace = true }
+serde_cbor = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }

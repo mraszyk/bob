@@ -1,14 +1,16 @@
 use candid::{CandidType, Nat};
-use serde::{Deserialize, Serialize};
+use orbit_essentials_macros::storable;
 
-#[derive(CandidType, Debug, Default, Serialize, Deserialize)]
+#[derive(CandidType, Debug, Default)]
+#[storable]
 pub struct MemberCycles {
     pub block: Nat,
     pub pending: Nat,
     pub remaining: Nat,
 }
 
-#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+#[derive(CandidType, Clone, Debug)]
+#[storable]
 pub struct Reward {
     pub timestamp: u64,
     pub cycles_burnt: u128,

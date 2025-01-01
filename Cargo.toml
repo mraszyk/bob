@@ -33,9 +33,12 @@ icp-ledger = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e
 ic-icp-index = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-icrc1-ledger = { git = "https://github.com/dfinity/ic/", rev = "bc83b42ae2b8c8246e6387731910842a12ebee90" }
 ic-ledger-types = "0.12.0"
+orbit-essentials = { git = "https://github.com/dfinity/orbit", tag = "@orbit/station-api-v0.3.0" }
+orbit-essentials-macros = { git = "https://github.com/dfinity/orbit", tag = "@orbit/station-api-v0.3.0" }
 pocket-ic = "6.0.0"
 rand = "0.8"
 rand_chacha = "0.3.1"
 scopeguard = "1.2.0"
+serde_cbor = "0.11.2"
 serde_json = "1.0.120"
 serde = "1.0.209"
