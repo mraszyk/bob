@@ -5,14 +5,14 @@ mod utils;
 
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
-    bob_balance, ensure_member_rewards, get_latest_blocks, get_member_cycles, get_miner,
-    is_pool_ready, join_native_pool, join_pool, mine_block, mine_block_with_round_length,
-    pool_logs, set_member_block_cycles, spawn_miner, transfer_to_principal, transfer_topup_pool,
-    update_miner_block_cycles, upgrade_miner,
+    bob_balance, ensure_member_rewards, get_latest_blocks, get_member_cycles, get_member_rewards,
+    get_miner, is_pool_ready, join_native_pool, join_pool, mine_block,
+    mine_block_with_round_length, pool_logs, set_member_block_cycles, spawn_miner,
+    transfer_to_principal, transfer_topup_pool, update_miner_block_cycles, upgrade_miner,
 };
 use bob_pool::MemberCycles;
-use candid::Principal;
-use pocket_ic::{query_candid_as, update_candid_as, CallError};
+use candid::{Decode, Encode, Principal};
+use pocket_ic::{query_candid_as, update_candid_as, CallError, UserError, WasmResult};
 
 // System canister IDs
 
@@ -404,4 +404,64 @@ fn test_pool_rewards() {
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
         .contains("Sent BoB top up transfer at ICP ledger block index 7."));
+}
+
+#[test]
+fn test_simultaneous_reward_payments() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let user = Principal::from_slice(&[0xFE; 29]);
+    let pic = setup(vec![admin, user]);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+    let miner_cycles = 15_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
+    mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    join_pool(&pic, admin, 1_000_000_000).unwrap();
+
+    let admin_block_cycles = 3_000_000_000_000;
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+
+    mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
+
+    while get_member_rewards(&pic, admin).is_empty() {
+        pic.advance_time(std::time::Duration::from_secs(1));
+        pic.tick();
+    }
+
+    let msg_1 = pic
+        .submit_call(
+            BOB_POOL_CANISTER_ID,
+            admin,
+            "pay_member_rewards",
+            Encode!(&()).unwrap(),
+        )
+        .unwrap();
+    let msg_2 = pic
+        .submit_call(
+            BOB_POOL_CANISTER_ID,
+            admin,
+            "pay_member_rewards",
+            Encode!(&()).unwrap(),
+        )
+        .unwrap();
+
+    let unwrap_res = |res: Result<WasmResult, UserError>| match res {
+        Ok(WasmResult::Reply(data)) => Decode!(&data, Result<(), String>).unwrap(),
+        Ok(WasmResult::Reject(msg)) => panic!("Unexpected reject: {}", msg),
+        Err(err) => panic!("Unexpected error: {}", err.description),
+    };
+    let res_1 = unwrap_res(pic.await_call(msg_1));
+    let res_2 = unwrap_res(pic.await_call(msg_2));
+
+    assert!(res_1.is_err() || res_2.is_err());
+    if let Err(err) = res_1 {
+        assert!(err.contains("Concurrency error"));
+    }
+    if let Err(err) = res_2 {
+        assert!(err.contains("Concurrency error"));
+    }
 }
