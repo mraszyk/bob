@@ -1,7 +1,7 @@
 use bob_pool::{
-    add_member_remaining_cycles, fetch_block, get_miner_canister, notify_top_up, pay_rewards, run,
-    set_member_rewards, set_miner_canister, spawn_miner, transfer, GuardPrincipal, MemberCycles,
-    Reward, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
+    add_member_remaining_cycles, fetch_block, get_miner_canister, init_member_rewards,
+    notify_top_up, pay_rewards, run, set_miner_canister, spawn_miner, transfer, GuardPrincipal,
+    MemberCycles, Reward, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
@@ -179,7 +179,7 @@ async fn join_pool(block_index: u64) -> Result<(), String> {
 
         let res = notify_top_up(block_index).await?;
         add_member_remaining_cycles(caller, res.get());
-        set_member_rewards(caller, vec![]);
+        init_member_rewards(caller);
 
         Ok(())
     } else {

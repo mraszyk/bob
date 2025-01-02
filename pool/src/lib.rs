@@ -6,8 +6,9 @@ pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
 pub use crate::memory::{
     add_member_remaining_cycles, commit_block_members, get_and_set_block_count,
     get_last_reward_timestamp, get_member_cycles, get_member_rewards, get_member_to_pending_cycles,
-    get_miner_canister, get_next_block_members, push_member_rewards, reset_member_pending_cycles,
-    set_last_reward_timestamp, set_member_block_cycles, set_member_rewards, set_miner_canister,
+    get_miner_canister, get_next_block_members, init_member_rewards, push_member_rewards,
+    reset_member_pending_cycles, set_last_reward_timestamp, set_member_block_cycles,
+    set_member_rewards, set_miner_canister,
 };
 pub use crate::rewards::{check_rewards, pay_rewards};
 pub use crate::state_machine::run;

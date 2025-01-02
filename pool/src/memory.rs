@@ -185,6 +185,14 @@ pub fn push_member_rewards(rewards: Vec<(Principal, Reward)>) {
     });
 }
 
+pub fn init_member_rewards(member: Principal) {
+    MEMBER_TO_REWARDS.with(|s| {
+        if s.borrow().get(&member).is_none() {
+            s.borrow_mut().insert(member, Cbor(vec![]));
+        }
+    });
+}
+
 pub fn get_member_rewards(member: Principal) -> Vec<Reward> {
     MEMBER_TO_REWARDS.with(|s| s.borrow().get(&member).map(|r| r.0).unwrap_or_default())
 }

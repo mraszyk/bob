@@ -496,3 +496,44 @@ fn test_simultaneous_reward_payments() {
         assert!(err.contains("Concurrency error"));
     }
 }
+
+#[test]
+fn test_join_pool_with_rewards() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let user = Principal::from_slice(&[0xFC; 29]);
+    let pic = setup(vec![admin, user]);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+    let miner_cycles = 15_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
+    mine_block(&pic);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    let num_blocks = 1;
+    let admin_block_cycles = 30_000_000_000_000;
+    join_pool(
+        &pic,
+        admin,
+        cycles_to_e8s((admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
+    )
+    .unwrap();
+
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+
+    ensure_member_rewards(&pic, admin, num_blocks);
+
+    let admin_rewards = get_member_rewards(&pic, admin);
+
+    join_pool(
+        &pic,
+        admin,
+        cycles_to_e8s((admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
+    )
+    .unwrap();
+
+    assert_eq!(get_member_rewards(&pic, admin).len(), admin_rewards.len());
+
+    ensure_member_rewards(&pic, admin, num_blocks);
+}
