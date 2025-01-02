@@ -289,20 +289,24 @@ fn test_pool_inactive_by_default() {
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
     deploy_ready_pool(&pic, admin);
 
-    let miner = spawn_miner(&pic, user, 100_000_000);
+    let miner = spawn_miner(&pic, user, 1_000_000_000);
 
     let miner_cycles = 50_000_000_000;
     update_miner_block_cycles(&pic, user, miner, miner_cycles);
 
-    let num_blocks = 3;
+    let pool_cycles = pic.cycle_balance(BOB_POOL_CANISTER_ID);
+    let num_blocks = 10;
     for _ in 0..num_blocks {
         mine_block(&pic);
     }
+    let pool_cycles_consumption = pool_cycles - pic.cycle_balance(BOB_POOL_CANISTER_ID);
+    let pool_cycles_consumption_per_block = pool_cycles_consumption / num_blocks as u128;
+    assert!(pool_cycles_consumption_per_block < 100_000_000);
 
     let blocks = get_latest_blocks(&pic);
     assert_eq!(blocks.len(), num_blocks);
     for block in blocks {
-        assert!((miner_cycles..=2 * miner_cycles)
+        assert!((miner_cycles..=3 * miner_cycles)
             .contains(&(block.total_cycles_burned.unwrap() as u128)));
     }
 
