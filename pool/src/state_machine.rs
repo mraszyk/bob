@@ -76,7 +76,6 @@ async fn stage_2(_: ()) -> Result<(), String> {
             top_up_cycles
         ));
     }
-    let miner = get_miner_canister().unwrap();
     deposit_cycles(CanisterIdRecord { canister_id: miner }, top_up_cycles)
         .await
         .map_err(|(code, msg)| {
