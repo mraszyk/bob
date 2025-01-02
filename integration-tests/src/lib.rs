@@ -3,7 +3,7 @@
 mod setup;
 mod utils;
 
-use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
+use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool, XDR_PERMYRIAD_PER_ICP};
 use crate::utils::{
     bob_balance, cycles_to_e8s, ensure_member_rewards, get_latest_blocks, get_member_cycles,
     get_member_rewards, get_miner, get_pool_state, is_pool_ready, join_native_pool, join_pool,
@@ -13,7 +13,7 @@ use crate::utils::{
 };
 use bob_pool::{MemberCycles, PoolRunningState, BOB_POOL_BLOCK_FEE};
 use candid::{Decode, Encode, Principal};
-use pocket_ic::{query_candid_as, update_candid_as, CallError, UserError, WasmResult};
+use pocket_ic::{update_candid_as, CallError, UserError, WasmResult};
 
 // System canister IDs
 
@@ -120,18 +120,6 @@ fn test_pool_not_ready() {
     deploy_pool(&pic, admin);
     assert!(!is_pool_ready(&pic));
 
-    let err = query_candid_as::<_, (Result<Option<MemberCycles>, String>,)>(
-        &pic,
-        BOB_POOL_CANISTER_ID,
-        admin,
-        "get_member_cycles",
-        ((),),
-    )
-    .unwrap()
-    .0
-    .unwrap_err();
-    assert!(err.contains("BoB pool canister is not ready; please try again later."));
-
     let block_index = transfer_topup_pool(&pic, admin, 100_000_000);
     let err = update_candid_as::<_, (Result<(), String>,)>(
         &pic,
@@ -197,11 +185,17 @@ fn test_join_pool() {
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
         assert_eq!(member_cycles.block, 0);
-        assert_eq!(member_cycles.remaining, 7_800_000_000_000);
+        assert_eq!(
+            member_cycles.remaining,
+            XDR_PERMYRIAD_PER_ICP as u128 * 100_000_000
+        );
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
         assert_eq!(member_cycles.block, 0);
-        assert_eq!(member_cycles.remaining, 2 * 7_800_000_000_000);
+        assert_eq!(
+            member_cycles.remaining,
+            2 * XDR_PERMYRIAD_PER_ICP as u128 * 100_000_000
+        );
     }
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);

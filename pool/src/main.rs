@@ -114,7 +114,6 @@ fn get_member_rewards() -> Vec<Reward> {
 
 #[update]
 async fn pay_member_rewards() -> Result<(), String> {
-    ensure_ready()?;
     pay_rewards(ic_cdk::caller()).await
 }
 
@@ -126,13 +125,11 @@ fn ensure_ready() -> Result<(), String> {
 
 #[query]
 fn get_member_cycles() -> Result<Option<MemberCycles>, String> {
-    ensure_ready()?;
     Ok(bob_pool::get_member_cycles(ic_cdk::caller()))
 }
 
 #[update]
 fn set_member_block_cycles(block_cycles: u128) -> Result<(), String> {
-    ensure_ready()?;
     let caller = ic_cdk::caller();
     if bob_pool::get_member_cycles(caller).is_none() {
         return Err(format!("The caller {} is no pool member.", caller));
