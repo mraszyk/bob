@@ -13,7 +13,7 @@ pub use crate::memory::{
 pub use crate::rewards::{check_rewards, pay_rewards};
 pub use crate::state_machine::run;
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
-pub use crate::types::{MemberCycles, Reward};
+pub use crate::types::{MemberCycles, PoolRunningState, PoolState, Reward};
 
 mod bob_calls;
 mod guard;
@@ -48,26 +48,58 @@ thread_local! {
     static __STATE: RefCell<State> = RefCell::default();
 }
 
+pub fn get_pool_state() -> PoolState {
+    PoolState {
+        miner: get_miner_canister(),
+        running_state: get_running_state(),
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct State {
-    pub running: bool,
+    pub running_state: PoolRunningState,
     pub principal_guards: BTreeSet<Principal>,
     pub active_tasks: BTreeSet<TaskType>,
 }
 
-pub fn is_running() -> bool {
-    __STATE.with(|s| s.borrow().running)
+pub fn get_running_state() -> PoolRunningState {
+    __STATE.with(|s| s.borrow().running_state)
 }
 
 pub fn start() {
-    mutate_state(|s| {
-        s.running = true;
-    });
+    match get_running_state() {
+        PoolRunningState::Running => (),
+        PoolRunningState::Stopping => {
+            running();
+        }
+        PoolRunningState::Stopped => {
+            running();
+            run(std::time::Duration::from_secs(0));
+        }
+    };
 }
 
 pub fn stop() {
+    if let PoolRunningState::Running = get_running_state() {
+        stopping();
+    }
+}
+
+fn running() {
     mutate_state(|s| {
-        s.running = false;
+        s.running_state = PoolRunningState::Running;
+    });
+}
+
+pub(crate) fn stopping() {
+    mutate_state(|s| {
+        s.running_state = PoolRunningState::Stopping;
+    });
+}
+
+pub(crate) fn stopped() {
+    mutate_state(|s| {
+        s.running_state = PoolRunningState::Stopped;
     });
 }
 

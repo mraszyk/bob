@@ -1,11 +1,11 @@
 use bob_pool::{
     add_member_remaining_cycles, fetch_block, get_miner_canister, init_member_rewards,
-    notify_top_up, pay_rewards, run, set_miner_canister, spawn_miner, start, transfer,
-    GuardPrincipal, MemberCycles, Reward, MAINNET_BOB_CANISTER_ID,
-    MAINNET_CYCLE_MINTER_CANISTER_ID,
+    notify_top_up, pay_rewards, run, set_miner_canister, spawn_miner, transfer, GuardPrincipal,
+    MemberCycles, PoolState, Reward, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
+use ic_cdk::api::is_controller;
 use ic_cdk::{init, inspect_message, post_upgrade, query, trap, update};
 use icp_ledger::{AccountIdentifier, Operation, Subaccount};
 use std::time::Duration;
@@ -28,9 +28,18 @@ fn inspect_message() {
         } else {
             accept_message();
         }
+    } else if method == "start" || method == "stop" {
+        if is_controller(&ic_cdk::caller()) {
+            accept_message();
+        } else {
+            trap(&format!(
+                "The method `{}` can only be called by controllers.",
+                method
+            ));
+        }
     } else {
         trap(&format!(
-            "The method {} cannot be called via ingress messages.",
+            "The method `{}` cannot be called via ingress messages.",
             method
         ));
     }
@@ -64,7 +73,6 @@ fn init() {
                 .await
                 .unwrap_or_else(|err| trap(&format!("Failed to init: {}", err)));
             set_miner_canister(miner);
-            start();
             run(Duration::from_secs(0));
         })
     });
@@ -72,11 +80,31 @@ fn init() {
 
 #[post_upgrade]
 fn post_upgrade() {
-    if get_miner().is_none() {
+    if get_miner_canister().is_none() {
         trap("No miner found.");
     }
-    start();
     run(Duration::from_secs(0));
+}
+
+#[update]
+fn start() {
+    if !is_controller(&ic_cdk::caller()) {
+        ic_cdk::trap("Only controllers can call `start`.");
+    }
+    bob_pool::start();
+}
+
+#[update]
+fn stop() {
+    if !is_controller(&ic_cdk::caller()) {
+        ic_cdk::trap("Only controllers can call `stop`.");
+    }
+    bob_pool::stop();
+}
+
+#[query]
+fn get_pool_state() -> PoolState {
+    bob_pool::get_pool_state()
 }
 
 #[query]
@@ -88,11 +116,6 @@ fn get_member_rewards() -> Vec<Reward> {
 async fn pay_member_rewards() -> Result<(), String> {
     ensure_ready()?;
     pay_rewards(ic_cdk::caller()).await
-}
-
-#[query]
-fn get_miner() -> Option<Principal> {
-    get_miner_canister()
 }
 
 fn ensure_ready() -> Result<(), String> {

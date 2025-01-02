@@ -6,11 +6,12 @@ mod utils;
 use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool};
 use crate::utils::{
     bob_balance, cycles_to_e8s, ensure_member_rewards, get_latest_blocks, get_member_cycles,
-    get_member_rewards, get_miner, is_pool_ready, join_native_pool, join_pool, mine_block,
-    mine_block_with_round_length, pool_logs, set_member_block_cycles, spawn_miner,
-    transfer_to_principal, transfer_topup_pool, update_miner_block_cycles, upgrade_miner,
+    get_member_rewards, get_miner, get_pool_state, is_pool_ready, join_native_pool, join_pool,
+    mine_block, mine_block_with_round_length, pool_logs, set_member_block_cycles, spawn_miner,
+    start_pool, stop_pool, transfer_to_principal, transfer_topup_pool, update_miner_block_cycles,
+    upgrade_miner, wait_for_stopped_pool,
 };
-use bob_pool::{MemberCycles, BOB_POOL_BLOCK_FEE};
+use bob_pool::{MemberCycles, PoolRunningState, BOB_POOL_BLOCK_FEE};
 use candid::{Decode, Encode, Principal};
 use pocket_ic::{query_candid_as, update_candid_as, CallError, UserError, WasmResult};
 
@@ -240,6 +241,37 @@ fn test_upgrade_pool() {
     ensure_member_rewards(&pic, admin, 1);
     join_pool(&pic, admin, join_e8s).unwrap();
     check_member_cycles(get_member_cycles(&pic, admin).unwrap());
+
+    let err = start_pool(&pic, user).unwrap_err();
+    assert!(err.contains("The method `start` can only be called by controllers."));
+    let err = stop_pool(&pic, user).unwrap_err();
+    assert!(err.contains("The method `stop` can only be called by controllers."));
+
+    match get_pool_state(&pic).running_state {
+        PoolRunningState::Running => (),
+        running_state => panic!("Unexpected pool running state: {:?}", running_state),
+    };
+    stop_pool(&pic, admin).unwrap();
+    match get_pool_state(&pic).running_state {
+        PoolRunningState::Stopping => (),
+        running_state => panic!("Unexpected pool running state: {:?}", running_state),
+    };
+    wait_for_stopped_pool(&pic);
+    match get_pool_state(&pic).running_state {
+        PoolRunningState::Stopped => (),
+        running_state => panic!("Unexpected pool running state: {:?}", running_state),
+    };
+    start_pool(&pic, admin).unwrap();
+    match get_pool_state(&pic).running_state {
+        PoolRunningState::Running => (),
+        running_state => panic!("Unexpected pool running state: {:?}", running_state),
+    };
+    stop_pool(&pic, admin).unwrap();
+    wait_for_stopped_pool(&pic);
+    match get_pool_state(&pic).running_state {
+        PoolRunningState::Stopped => (),
+        running_state => panic!("Unexpected pool running state: {:?}", running_state),
+    };
 
     upgrade_pool(&pic, admin).unwrap();
     assert!(is_pool_ready(&pic));

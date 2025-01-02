@@ -5,7 +5,7 @@ use crate::{
 };
 use bob_miner_v2::MinerSettings;
 use bob_minter_v2::{Block, Stats};
-use bob_pool::{MemberCycles, Reward};
+use bob_pool::{MemberCycles, PoolRunningState, PoolState, Reward};
 use candid::{Nat, Principal};
 use ic_ledger_core::block::BlockType;
 use ic_ledger_types::{
@@ -13,7 +13,7 @@ use ic_ledger_types::{
 };
 use icrc_ledger_types::icrc1::account::Account;
 use pocket_ic::management_canister::CanisterLogRecord;
-use pocket_ic::{query_candid_as, update_candid_as, PocketIc};
+use pocket_ic::{query_candid_as, update_candid_as, CallError, PocketIc};
 
 pub(crate) fn get_icp_block(pic: &PocketIc, block_index: u64) -> Option<icp_ledger::Block> {
     let get_blocks_args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {
@@ -242,16 +242,20 @@ pub(crate) fn set_member_block_cycles(
     .0
 }
 
-pub(crate) fn get_miner(pic: &PocketIc) -> Option<Principal> {
-    query_candid_as::<_, (Option<Principal>,)>(
+pub(crate) fn get_pool_state(pic: &PocketIc) -> PoolState {
+    query_candid_as::<_, (PoolState,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         Principal::anonymous(),
-        "get_miner",
+        "get_pool_state",
         ((),),
     )
     .unwrap()
     .0
+}
+
+pub(crate) fn get_miner(pic: &PocketIc) -> Option<Principal> {
+    get_pool_state(pic).miner
 }
 
 pub(crate) fn is_pool_ready(pic: &PocketIc) -> bool {
@@ -320,4 +324,32 @@ pub(crate) fn cycles_to_e8s(amount: u128) -> u64 {
     (amount / XDR_PERMYRIAD_PER_ICP as u128 + 1)
         .try_into()
         .unwrap()
+}
+
+pub(crate) fn start_pool(pic: &PocketIc, user_id: Principal) -> Result<(), String> {
+    update_candid_as::<_, ((),)>(pic, BOB_POOL_CANISTER_ID, user_id, "start", ((),))
+        .map(|res| res.0)
+        .map_err(|err| match err {
+            CallError::UserError(err) => err.description,
+            CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
+        })
+}
+
+pub(crate) fn stop_pool(pic: &PocketIc, user_id: Principal) -> Result<(), String> {
+    update_candid_as::<_, ((),)>(pic, BOB_POOL_CANISTER_ID, user_id, "stop", ((),))
+        .map(|res| res.0)
+        .map_err(|err| match err {
+            CallError::UserError(err) => err.description,
+            CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
+        })
+}
+
+pub(crate) fn wait_for_stopped_pool(pic: &PocketIc) {
+    loop {
+        if let PoolRunningState::Stopped = get_pool_state(pic).running_state {
+            break;
+        }
+        pic.advance_time(std::time::Duration::from_secs(5));
+        pic.tick();
+    }
 }
