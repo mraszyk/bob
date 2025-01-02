@@ -8,38 +8,24 @@ use ic_cdk::trap;
 use std::future::Future;
 use std::time::Duration;
 
-fn retry_and_log<F, A, Fut>(
-    initial_delay: Duration,
-    retry_delay: Duration,
-    max_attempts: u64,
-    phase: &'static str,
-    f: F,
-    arg: A,
-) where
+fn try_and_log_error<F, A, Fut>(delay: Duration, phase: &'static str, f: F, arg: A)
+where
     F: FnOnce(A) -> Fut + Copy + 'static,
     A: Copy + 'static,
     Fut: Future<Output = Result<(), String>>,
 {
-    ic_cdk_timers::set_timer(initial_delay, move || {
+    ic_cdk_timers::set_timer(delay, move || {
         ic_cdk::spawn(async move {
             if let Err(err) = f(arg).await {
                 ic_cdk::print(format!("ERR({}): {}", phase, err));
-                if max_attempts == 1 {
-                    ic_cdk::print(format!(
-                        "ERR(retry_and_log): Exceeded max attempts in {}: starting from scratch.",
-                        phase
-                    ));
-                    run(retry_delay);
-                } else {
-                    retry_and_log(retry_delay, retry_delay, max_attempts - 1, phase, f, arg);
-                }
+                run(Duration::from_secs(0));
             }
         });
     });
 }
 
 pub fn run(delay: Duration) {
-    retry_and_log(delay, Duration::from_secs(0), 1, "stage_1", stage_1, ());
+    try_and_log_error(delay, "stage_1", stage_1, ());
 }
 
 async fn stage_1(_: ()) -> Result<(), String> {
@@ -49,14 +35,7 @@ async fn stage_1(_: ()) -> Result<(), String> {
     let stats = get_bob_statistics().await?;
     let time_since_last_block = stats.time_since_last_block;
     if time_since_last_block < 120 {
-        retry_and_log(
-            Duration::from_secs(0),
-            Duration::from_secs(0),
-            1,
-            "stage_2",
-            stage_2,
-            (),
-        );
+        try_and_log_error(Duration::from_secs(0), "stage_2", stage_2, ());
     } else if time_since_last_block >= 490 {
         let block_count = stats.block_count;
         return Err(format!(
@@ -64,10 +43,8 @@ async fn stage_1(_: ()) -> Result<(), String> {
             block_count, time_since_last_block
         ));
     } else {
-        retry_and_log(
+        try_and_log_error(
             Duration::from_secs(490 - time_since_last_block),
-            Duration::from_secs(0),
-            1,
             "stage_1",
             stage_1,
             (),
@@ -109,10 +86,8 @@ async fn stage_2(_: ()) -> Result<(), String> {
             )
         })?;
     commit_block_members(next_block_members);
-    retry_and_log(
-        Duration::from_secs(250),
-        Duration::from_secs(10),
-        3,
+    try_and_log_error(
+        Duration::from_secs(270),
         "stage_3",
         stage_3,
         total_member_block_cycles,
