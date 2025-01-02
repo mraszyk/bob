@@ -1,7 +1,8 @@
 use bob_pool::{
     add_member_remaining_cycles, fetch_block, get_miner_canister, init_member_rewards,
-    notify_top_up, pay_rewards, run, set_miner_canister, spawn_miner, transfer, GuardPrincipal,
-    MemberCycles, Reward, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
+    notify_top_up, pay_rewards, run, set_miner_canister, spawn_miner, start, transfer,
+    GuardPrincipal, MemberCycles, Reward, MAINNET_BOB_CANISTER_ID,
+    MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
@@ -63,6 +64,7 @@ fn init() {
                 .await
                 .unwrap_or_else(|err| trap(&format!("Failed to init: {}", err)));
             set_miner_canister(miner);
+            start();
             run(Duration::from_secs(0));
         })
     });
@@ -73,6 +75,7 @@ fn post_upgrade() {
     if get_miner().is_none() {
         trap("No miner found.");
     }
+    start();
     run(Duration::from_secs(0));
 }
 

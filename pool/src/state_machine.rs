@@ -1,7 +1,7 @@
 use crate::{
     check_rewards, commit_block_members, get_and_set_block_count, get_bob_statistics,
-    get_miner_canister, get_miner_statistics, get_next_block_members, update_miner_settings,
-    upgrade_miner,
+    get_miner_canister, get_miner_statistics, get_next_block_members, is_running, stop,
+    update_miner_settings, upgrade_miner,
 };
 use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
@@ -25,7 +25,9 @@ where
 }
 
 pub fn run(delay: Duration) {
-    try_and_log_error(delay, "stage_1", stage_1, ());
+    if is_running() {
+        try_and_log_error(delay, "stage_1", stage_1, ());
+    }
 }
 
 async fn stage_1(_: ()) -> Result<(), String> {
@@ -53,12 +55,7 @@ async fn stage_1(_: ()) -> Result<(), String> {
         ));
     } else {
         debug_assert!((120..490).contains(&time_since_last_block));
-        try_and_log_error(
-            Duration::from_secs(490 - time_since_last_block),
-            "stage_1",
-            stage_1,
-            (),
-        );
+        run(Duration::from_secs(490 - time_since_last_block));
     }
     Ok(())
 }
@@ -80,6 +77,7 @@ async fn stage_2(_: ()) -> Result<(), String> {
     let target_miner_cycle_balance = total_member_block_cycles + 1_000_000_000_000;
     let top_up_cycles = target_miner_cycle_balance.saturating_sub(miner_stats.cycle_balance.into());
     if canister_balance128() - top_up_cycles < 1_000_000_000_000 {
+        stop();
         return Err(format!(
             "Pool cycles {} too low after topping up miner with {} cycles.",
             canister_balance128(),

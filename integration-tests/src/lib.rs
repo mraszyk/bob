@@ -212,29 +212,48 @@ fn test_join_pool() {
 #[test]
 fn test_upgrade_pool() {
     let admin = Principal::from_slice(&[0xFF; 29]);
-    let pic = setup(vec![admin]);
+    let user = Principal::from_slice(&[0xFE; 29]);
+    let pic = setup(vec![admin, user]);
+
+    let miner = spawn_miner(&pic, user, 1_000_000_000);
+    let miner_cycles = 50_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
 
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
     deploy_ready_pool(&pic, admin);
     let bob_miner = get_miner(&pic).unwrap();
 
-    join_pool(&pic, admin, 100_000_000).unwrap();
-    set_member_block_cycles(&pic, admin, 100_000_000_000_u128).unwrap();
-    let member_cycles = get_member_cycles(&pic, admin).unwrap();
-    assert_eq!(member_cycles.block, 100_000_000_000);
-    assert_eq!(member_cycles.remaining, 7_800_000_000_000);
+    let admin_block_cycles = 50_000_000_000_000;
+    let join_e8s = cycles_to_e8s(admin_block_cycles + BOB_POOL_BLOCK_FEE);
+    join_pool(&pic, admin, join_e8s).unwrap();
+
+    let check_member_cycles = |member_cycles: MemberCycles| {
+        assert_eq!(member_cycles.block, admin_block_cycles);
+        assert!((admin_block_cycles + BOB_POOL_BLOCK_FEE
+            ..admin_block_cycles + 2 * BOB_POOL_BLOCK_FEE)
+            .contains(&member_cycles.remaining));
+    };
+
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+    check_member_cycles(get_member_cycles(&pic, admin).unwrap());
+
+    ensure_member_rewards(&pic, admin, 1);
+    join_pool(&pic, admin, join_e8s).unwrap();
+    check_member_cycles(get_member_cycles(&pic, admin).unwrap());
 
     upgrade_pool(&pic, admin).unwrap();
     assert!(is_pool_ready(&pic));
     assert_eq!(get_miner(&pic).unwrap(), bob_miner);
-    let member_cycles = get_member_cycles(&pic, admin).unwrap();
-    assert_eq!(member_cycles.block, 100_000_000_000);
-    assert_eq!(member_cycles.remaining, 7_800_000_000_000);
+    check_member_cycles(get_member_cycles(&pic, admin).unwrap());
+
+    ensure_member_rewards(&pic, admin, 2);
+    join_pool(&pic, admin, join_e8s).unwrap();
+    check_member_cycles(get_member_cycles(&pic, admin).unwrap());
 
     assert_eq!(pool_logs(&pic, admin).len(), 1);
     assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
         .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index 2."));
+        .contains("Sent BoB top up transfer at ICP ledger block index 5."));
 }
 
 #[test]

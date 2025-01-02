@@ -50,8 +50,25 @@ thread_local! {
 
 #[derive(Clone, Debug, Default)]
 pub struct State {
+    pub running: bool,
     pub principal_guards: BTreeSet<Principal>,
     pub active_tasks: BTreeSet<TaskType>,
+}
+
+pub fn is_running() -> bool {
+    __STATE.with(|s| s.borrow().running)
+}
+
+pub fn start() {
+    mutate_state(|s| {
+        s.running = true;
+    });
+}
+
+pub fn stop() {
+    mutate_state(|s| {
+        s.running = false;
+    });
 }
 
 pub fn mutate_state<F, R>(f: F) -> R
