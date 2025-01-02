@@ -4,7 +4,6 @@ use crate::{
 };
 use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
-use ic_cdk::trap;
 use std::future::Future;
 use std::time::Duration;
 
@@ -43,6 +42,7 @@ async fn stage_1(_: ()) -> Result<(), String> {
             block_count, time_since_last_block
         ));
     } else {
+        debug_assert!((120..490).contains(&time_since_last_block));
         try_and_log_error(
             Duration::from_secs(490 - time_since_last_block),
             "stage_1",
@@ -60,7 +60,7 @@ async fn stage_2(_: ()) -> Result<(), String> {
         .map(|(_, block_cycles)| block_cycles)
         .sum();
     if total_member_block_cycles == 0 {
-        run(Duration::from_secs(60));
+        run(Duration::from_secs(370));
         return Ok(());
     }
     let miner = get_miner_canister().unwrap();
@@ -70,7 +70,7 @@ async fn stage_2(_: ()) -> Result<(), String> {
     let target_miner_cycle_balance = total_member_block_cycles + 1_000_000_000_000;
     let top_up_cycles = target_miner_cycle_balance.saturating_sub(miner_stats.cycle_balance.into());
     if canister_balance128() - top_up_cycles < 1_000_000_000_000 {
-        trap(&format!(
+        return Err(format!(
             "Pool cycles {} too low after topping up miner with {} cycles.",
             canister_balance128(),
             top_up_cycles

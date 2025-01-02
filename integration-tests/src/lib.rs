@@ -353,13 +353,17 @@ fn test_pool_rewards() {
     ensure_member_rewards(&pic, user_2, num_blocks);
 
     let blocks = get_latest_blocks(&pic);
-    assert_eq!(blocks.len(), num_blocks + 1);
+    assert_eq!(blocks.len(), num_blocks + 2);
     let total_block_cycles = admin_block_cycles + user_1_block_cycles + user_2_block_cycles;
     for block in blocks.iter().take(num_blocks) {
         assert!(
             (total_block_cycles + miner_cycles..=total_block_cycles + 2 * miner_cycles)
                 .contains(&(block.total_cycles_burned.unwrap() as u128))
         );
+    }
+    for block in blocks.iter().skip(num_blocks) {
+        assert!((miner_cycles..=2 * miner_cycles)
+            .contains(&(block.total_cycles_burned.unwrap() as u128)));
     }
 
     assert_eq!(
