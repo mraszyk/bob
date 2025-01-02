@@ -33,6 +33,7 @@ where
 #[derive(Clone, Copy, Default, Deserialize, Serialize)]
 struct State {
     pub miner: Option<Principal>,
+    pub block_count: u64,
     pub last_reward_timestamp: u64,
 }
 
@@ -75,6 +76,16 @@ pub fn set_miner_canister(miner: Principal) {
         state.0.miner = Some(miner);
         s.borrow_mut().set(state).unwrap();
     });
+}
+
+pub fn get_and_set_block_count(block_count: u64) -> u64 {
+    POOL_STATE.with(|s| {
+        let mut state = s.borrow().get().clone();
+        let last_block_count = state.0.block_count;
+        state.0.block_count = block_count;
+        s.borrow_mut().set(state).unwrap();
+        last_block_count
+    })
 }
 
 pub fn get_last_reward_timestamp() -> u64 {

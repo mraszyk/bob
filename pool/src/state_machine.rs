@@ -1,6 +1,7 @@
 use crate::{
-    check_rewards, commit_block_members, get_bob_statistics, get_miner_canister,
-    get_miner_statistics, get_next_block_members, update_miner_settings, upgrade_miner,
+    check_rewards, commit_block_members, get_and_set_block_count, get_bob_statistics,
+    get_miner_canister, get_miner_statistics, get_next_block_members, update_miner_settings,
+    upgrade_miner,
 };
 use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
@@ -17,7 +18,7 @@ where
         ic_cdk::spawn(async move {
             if let Err(err) = f(arg).await {
                 ic_cdk::print(format!("ERR({}): {}", phase, err));
-                run(Duration::from_secs(0));
+                run(Duration::from_secs(10));
             }
         });
     });
@@ -32,6 +33,15 @@ async fn stage_1(_: ()) -> Result<(), String> {
     update_miner_settings(miner, Some(0), None).await?;
     check_rewards().await?;
     let stats = get_bob_statistics().await?;
+    let block_count = stats.block_count;
+    let last_block_count = get_and_set_block_count(block_count);
+    if 0 < last_block_count && last_block_count + 1 < block_count {
+        ic_cdk::print(format!(
+            "WARN(stage_1): skipped blocks {}..<{}",
+            last_block_count + 1,
+            block_count
+        ));
+    }
     let time_since_last_block = stats.time_since_last_block;
     if time_since_last_block < 120 {
         try_and_log_error(Duration::from_secs(0), "stage_2", stage_2, ());
