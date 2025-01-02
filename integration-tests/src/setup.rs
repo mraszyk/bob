@@ -15,6 +15,8 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
+pub const XDR_PERMYRIAD_PER_ICP: u64 = 7_8000; // 7.80 SDR per ICP
+
 // System canister init args
 
 #[derive(CandidType)]
@@ -159,7 +161,7 @@ fn deploy_cmc(pic: &PocketIc) {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
-        xdr_permyriad_per_icp: 7_8000, // 7.80 SDR per ICP
+        xdr_permyriad_per_icp: XDR_PERMYRIAD_PER_ICP,
     };
     update_candid_as::<_, (Result<(), String>,)>(
         pic,

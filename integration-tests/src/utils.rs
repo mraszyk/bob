@@ -1,3 +1,4 @@
+use crate::setup::XDR_PERMYRIAD_PER_ICP;
 use crate::{
     BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID, NNS_CYCLES_MINTING_CANISTER_ID,
     NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
@@ -309,8 +310,14 @@ pub(crate) fn pay_member_rewards(pic: &PocketIc, user_id: Principal) {
 
 pub(crate) fn ensure_member_rewards(pic: &PocketIc, user_id: Principal, num_rewards: usize) {
     while get_member_rewards(pic, user_id).len() < num_rewards {
-        pic.advance_time(std::time::Duration::from_secs(1));
+        pic.advance_time(std::time::Duration::from_secs(5));
         pic.tick();
     }
     pay_member_rewards(pic, user_id);
+}
+
+pub(crate) fn cycles_to_e8s(amount: u128) -> u64 {
+    (amount / XDR_PERMYRIAD_PER_ICP as u128 + 1)
+        .try_into()
+        .unwrap()
 }
