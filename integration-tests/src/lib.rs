@@ -7,12 +7,13 @@ use crate::setup::{deploy_ready_pool, setup, upgrade_pool, XDR_PERMYRIAD_PER_ICP
 use crate::utils::{
     bob_balance, check_pool_logs, cycles_to_e8s, ensure_member_rewards, get_latest_blocks,
     get_member_cycles, get_member_rewards, get_miner, get_pool_state, is_pool_ready,
-    join_native_pool, join_pool, mine_block, mine_block_with_round_length, set_member_block_cycles,
-    spawn_miner, start_pool, stop_pool, transfer_to_principal, update_miner_block_cycles,
-    upgrade_miner, wait_for_stopped_pool,
+    join_native_pool, join_pool, mine_block, mine_block_with_round_length, pool_logs,
+    set_member_block_cycles, spawn_miner, start_pool, stop_pool, transfer_to_principal,
+    update_miner_block_cycles, upgrade_miner, wait_for_stopped_pool,
 };
 use bob_pool::{MemberCycles, PoolRunningState, BOB_POOL_BLOCK_FEE};
 use candid::{Decode, Encode, Principal};
+use pocket_ic::management_canister::CanisterSettings;
 use pocket_ic::{UserError, WasmResult};
 
 // System canister IDs
@@ -573,7 +574,7 @@ fn test_simultaneous_reward_payments() {
 }
 
 #[test]
-fn test_join_pool_with_rewards() {
+fn test_join_pool_after_rewards() {
     let admin = Principal::from_slice(&[0xFF; 29]);
     let user = Principal::from_slice(&[0xFE; 29]);
     let pic = setup(vec![admin, user]);
@@ -609,4 +610,217 @@ fn test_join_pool_with_rewards() {
     ensure_member_rewards(&pic, admin, num_blocks);
 
     check_pool_logs(&pic, admin);
+}
+
+#[test]
+fn test_frozen_bob() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let user = Principal::from_slice(&[0xFE; 29]);
+    let pic = setup(vec![admin, user]);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+    let miner_cycles = 15_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    let num_blocks = 2;
+    let admin_block_cycles = 30_000_000_000_000;
+    let total_block_cycles = admin_block_cycles;
+    join_pool(
+        &pic,
+        admin,
+        cycles_to_e8s(2 * (admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
+    )
+    .unwrap();
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+
+    let member_cycles_admin = get_member_cycles(&pic, admin).unwrap();
+
+    ensure_member_rewards(&pic, admin, num_blocks);
+
+    pic.update_canister_settings(
+        BOB_CANISTER_ID,
+        Some(NNS_ROOT_CANISTER_ID),
+        CanisterSettings {
+            freezing_threshold: Some((1_u64 << 63).into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    for _ in 0..180 {
+        pic.advance_time(std::time::Duration::from_secs(5));
+        pic.tick();
+    }
+
+    pic.update_canister_settings(
+        BOB_CANISTER_ID,
+        Some(NNS_ROOT_CANISTER_ID),
+        CanisterSettings {
+            freezing_threshold: Some((86_400_u64 * 30).into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    for _ in 0..num_blocks {
+        mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
+    }
+
+    ensure_member_rewards(&pic, admin, 2 * num_blocks);
+
+    let mut blocks = get_latest_blocks(&pic);
+    assert!(blocks.len() < 10);
+    blocks.reverse();
+    assert_eq!(blocks.len(), 2 + num_blocks + 1 + num_blocks);
+    for (idx, block) in blocks.into_iter().enumerate() {
+        if idx >= 2 && idx - 2 != num_blocks {
+            assert!(
+                (total_block_cycles + miner_cycles..=total_block_cycles + 3 * miner_cycles)
+                    .contains(&(block.total_cycles_burned.unwrap() as u128))
+            );
+        } else {
+            assert!((miner_cycles..=3 * miner_cycles)
+                .contains(&(block.total_cycles_burned.unwrap() as u128)));
+        }
+    }
+
+    assert_eq!(
+        bob_balance(&pic, admin) as u128,
+        2 * (60_000_000_000 - 1_000_000) * num_blocks as u128
+    );
+
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, admin_block_cycles);
+    assert_eq!(member_cycles.pending, 0);
+    assert_eq!(
+        member_cycles.remaining
+            + 2 * (admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128,
+        member_cycles_admin.remaining
+    );
+
+    let logs: Vec<_> = pool_logs(&pic, admin)
+        .into_iter()
+        .map(|log| String::from_utf8(log.content).unwrap())
+        .collect();
+    assert!(logs
+        .iter()
+        .any(|msg| msg.contains("Sent BoB top up transfer at ICP ledger block index")));
+    assert!(logs
+        .iter()
+        .any(|msg| msg.contains("Canister 6lnhz-oaaaa-aaaas-aabkq-cai is out of cycles")));
+    assert!(logs.iter().all(|msg| msg
+        .contains("Sent BoB top up transfer at ICP ledger block index")
+        || msg.contains("Canister 6lnhz-oaaaa-aaaas-aabkq-cai is out of cycles")));
+}
+
+#[test]
+fn test_frozen_pool() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let user = Principal::from_slice(&[0xFE; 29]);
+    let pic = setup(vec![admin, user]);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+    let miner_cycles = 15_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    let num_blocks = 4;
+    let admin_block_cycles = 30_000_000_000_000;
+    let total_block_cycles = admin_block_cycles;
+    join_pool(
+        &pic,
+        admin,
+        cycles_to_e8s((admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
+    )
+    .unwrap();
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+
+    let member_cycles_admin = get_member_cycles(&pic, admin).unwrap();
+
+    ensure_member_rewards(&pic, admin, 1);
+
+    for _ in 0..40 {
+        pic.advance_time(std::time::Duration::from_secs(5));
+        pic.tick();
+    }
+
+    pic.update_canister_settings(
+        BOB_POOL_CANISTER_ID,
+        Some(admin),
+        CanisterSettings {
+            freezing_threshold: Some((1_u64 << 63).into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
+    mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
+
+    pic.update_canister_settings(
+        BOB_POOL_CANISTER_ID,
+        Some(admin),
+        CanisterSettings {
+            freezing_threshold: Some(0_u64.into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    ensure_member_rewards(&pic, admin, num_blocks - 1);
+
+    let mut blocks = get_latest_blocks(&pic);
+    assert!(blocks.len() < 10);
+    blocks.reverse();
+    assert_eq!(blocks.len(), 2 + num_blocks + 2);
+    for (idx, block) in blocks.into_iter().enumerate() {
+        if idx >= 2 && !(2..=4).contains(&(idx - 2)) {
+            assert!(
+                (total_block_cycles + miner_cycles..=total_block_cycles + 3 * miner_cycles)
+                    .contains(&(block.total_cycles_burned.unwrap() as u128))
+            );
+        } else {
+            assert!((miner_cycles..=3 * miner_cycles)
+                .contains(&(block.total_cycles_burned.unwrap() as u128)));
+        }
+    }
+
+    assert_eq!(
+        bob_balance(&pic, admin) as u128,
+        (60_000_000_000 - 1_000_000) * (num_blocks - 1) as u128
+    );
+
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, admin_block_cycles);
+    assert_eq!(member_cycles.pending, 0);
+    assert_eq!(
+        member_cycles.remaining
+            + (admin_block_cycles + BOB_POOL_BLOCK_FEE) * (num_blocks - 1) as u128,
+        member_cycles_admin.remaining
+    );
+
+    let logs: Vec<_> = pool_logs(&pic, admin)
+        .into_iter()
+        .map(|log| String::from_utf8(log.content).unwrap())
+        .collect();
+    let miner = get_miner(&pic).unwrap();
+    assert!(logs
+        .iter()
+        .any(|msg| msg.contains("Sent BoB top up transfer at ICP ledger block index")));
+    assert!(logs
+        .iter()
+        .any(|msg| msg.contains("WARN(stage_1): skipped blocks 1445..<1446")));
+    assert!(logs
+        .iter()
+        .any(|msg| msg.contains(&format!("Canister {} is out of cycles", miner))));
+    assert!(logs.iter().all(|msg| msg
+        .contains("Sent BoB top up transfer at ICP ledger block index")
+        || msg.contains("WARN(stage_1): skipped blocks 1445..<1446")
+        || msg.contains(&format!("Canister {} is out of cycles", miner))
+        || msg.contains("ERR(stage_3): Last cycles burned")));
 }

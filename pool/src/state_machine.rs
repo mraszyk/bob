@@ -3,10 +3,35 @@ use crate::{
     get_miner_canister, get_miner_statistics, get_next_block_members, get_running_state, stopped,
     stopping, update_miner_settings, upgrade_miner, PoolRunningState,
 };
+use candid::Principal;
 use ic_cdk::api::canister_balance128;
 use ic_cdk::api::management_canister::main::{deposit_cycles, CanisterIdRecord};
 use std::future::Future;
 use std::time::Duration;
+
+async fn recover_miner(miner: Principal) -> Result<(), String> {
+    let top_up_cycles = 1_000_000_000_000;
+    if canister_balance128() - top_up_cycles < 1_000_000_000_000 {
+        stopping();
+        return Err(format!(
+            "Pool cycles {} too low after topping up miner with {} cycles.",
+            canister_balance128(),
+            top_up_cycles
+        ));
+    }
+    deposit_cycles(CanisterIdRecord { canister_id: miner }, top_up_cycles)
+        .await
+        .map_err(|(code, msg)| {
+            format!(
+                "Error while depositing cycles to miner ({:?}): {}",
+                code, msg
+            )
+        })?;
+    upgrade_miner(miner).await?;
+    update_miner_settings(miner, Some(0), None).await?;
+    run(Duration::from_secs(120));
+    Ok(())
+}
 
 fn try_and_log_error<F, A, Fut>(delay: Duration, phase: &'static str, f: F, arg: A)
 where
@@ -18,7 +43,17 @@ where
         ic_cdk::spawn(async move {
             if let Err(err) = f(arg).await {
                 ic_cdk::print(format!("ERR({}): {}", phase, err));
-                run(Duration::from_secs(10));
+                let miner = get_miner_canister().unwrap();
+                if err.contains(&format!("Canister {} is out of cycles", miner)) {
+                    try_and_log_error(
+                        Duration::from_secs(0),
+                        "recover_miner",
+                        recover_miner,
+                        miner,
+                    );
+                } else {
+                    run(Duration::from_secs(120));
+                }
             }
         });
     });
@@ -116,6 +151,7 @@ async fn stage_3(total_member_block_cycles: u128) -> Result<(), String> {
             miner_stats.last_round_cyles_burned, total_member_block_cycles
         ));
     }
+    update_miner_settings(miner, Some(0), None).await?;
     let stats = get_bob_statistics().await?;
     let time_since_last_block = stats.time_since_last_block;
     run(Duration::from_secs(490 - time_since_last_block));
