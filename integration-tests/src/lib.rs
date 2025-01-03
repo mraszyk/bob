@@ -123,11 +123,15 @@ fn test_join_pool() {
     deploy_ready_pool(&pic, admin);
 
     for user in [admin, user_1, user_2] {
-        assert!(get_member_cycles(&pic, user).is_none());
+        assert!(get_member_cycles(&pic, user)
+            .unwrap_err()
+            .contains(&format!("The caller {} is no pool member.", user)));
         assert!(join_pool(&pic, user, 10_000_000).unwrap_err().contains(
             "Transaction amount (0.10000000 Token) too low: should be at least 0.99990000 Token."
         ));
-        assert!(get_member_cycles(&pic, user).is_none());
+        assert!(get_member_cycles(&pic, user)
+            .unwrap_err()
+            .contains(&format!("The caller {} is no pool member.", user)));
         join_pool(&pic, user, 100_000_000).unwrap();
         let member_cycles = get_member_cycles(&pic, user).unwrap();
         assert_eq!(member_cycles.block, 0);

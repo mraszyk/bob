@@ -212,8 +212,11 @@ pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
     .unwrap()
 }
 
-pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<MemberCycles> {
-    query_candid_as::<_, (Result<Option<MemberCycles>, String>,)>(
+pub(crate) fn get_member_cycles(
+    pic: &PocketIc,
+    user_id: Principal,
+) -> Result<MemberCycles, String> {
+    query_candid_as::<_, (Result<MemberCycles, String>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         user_id,
@@ -222,7 +225,6 @@ pub(crate) fn get_member_cycles(pic: &PocketIc, user_id: Principal) -> Option<Me
     )
     .unwrap()
     .0
-    .unwrap()
 }
 
 pub(crate) fn set_member_block_cycles(
@@ -288,7 +290,7 @@ pub(crate) fn update_miner_block_cycles(
 }
 
 pub(crate) fn get_member_rewards(pic: &PocketIc, user_id: Principal) -> Vec<Reward> {
-    query_candid_as::<_, (Vec<Reward>,)>(
+    query_candid_as::<_, (Result<Vec<Reward>, String>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         user_id,
@@ -297,6 +299,7 @@ pub(crate) fn get_member_rewards(pic: &PocketIc, user_id: Principal) -> Vec<Rewa
     )
     .unwrap()
     .0
+    .unwrap()
 }
 
 pub(crate) fn pay_member_rewards(pic: &PocketIc, user_id: Principal) {

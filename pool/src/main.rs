@@ -43,14 +43,25 @@ fn inspect_message() {
     }
 }
 
-#[query]
-fn get_member_cycles() -> Result<Option<MemberCycles>, String> {
-    Ok(bob_pool::get_member_cycles(ic_cdk::caller()))
+fn ensure_caller_pool_member() -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if bob_pool::get_member_cycles(caller).is_none() {
+        Err(format!("The caller {} is no pool member.", caller))
+    } else {
+        Ok(())
+    }
 }
 
 #[query]
-fn get_member_rewards() -> Vec<Reward> {
-    bob_pool::get_member_rewards(ic_cdk::caller())
+fn get_member_cycles() -> Result<MemberCycles, String> {
+    ensure_caller_pool_member()?;
+    Ok(bob_pool::get_member_cycles(ic_cdk::caller()).unwrap())
+}
+
+#[query]
+fn get_member_rewards() -> Result<Vec<Reward>, String> {
+    ensure_caller_pool_member()?;
+    Ok(bob_pool::get_member_rewards(ic_cdk::caller()))
 }
 
 #[query]
@@ -60,15 +71,13 @@ fn get_pool_state() -> PoolState {
 
 #[update]
 async fn pay_member_rewards() -> Result<(), String> {
+    ensure_caller_pool_member()?;
     pay_rewards(ic_cdk::caller()).await
 }
 
 #[update]
 fn set_member_block_cycles(block_cycles: u128) -> Result<(), String> {
-    let caller = ic_cdk::caller();
-    if bob_pool::get_member_cycles(caller).is_none() {
-        return Err(format!("The caller {} is no pool member.", caller));
-    }
+    ensure_caller_pool_member()?;
     if block_cycles != 0 && block_cycles < 15_000_000_000 {
         return Err(format!(
             "The number of block cycles {} is too small.",
@@ -81,7 +90,7 @@ fn set_member_block_cycles(block_cycles: u128) -> Result<(), String> {
             block_cycles, 1000000_u128
         ));
     }
-    bob_pool::set_member_block_cycles(caller, block_cycles);
+    bob_pool::set_member_block_cycles(ic_cdk::caller(), block_cycles);
     Ok(())
 }
 
