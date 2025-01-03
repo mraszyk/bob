@@ -4,7 +4,7 @@ use bob_pool::{
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
-use ic_cdk::api::is_controller;
+use ic_cdk::api::{in_replicated_execution, is_controller};
 use ic_cdk::{inspect_message, query, trap, update};
 use icp_ledger::{AccountIdentifier, Operation, Subaccount};
 
@@ -20,7 +20,7 @@ fn inspect_message() {
         let arg_size = arg_data_raw_size();
         if arg_size > 1_000 {
             trap(&format!(
-                "Unexpected argument length of {} for method {}.",
+                "Unexpected argument length of {} for method `{}`.",
                 arg_size, method
             ))
         } else {
@@ -65,8 +65,14 @@ fn get_member_rewards() -> Result<Vec<Reward>, String> {
 }
 
 #[query]
-fn get_pool_state() -> PoolState {
-    bob_pool::get_pool_state()
+fn get_pool_state() -> Result<PoolState, String> {
+    if in_replicated_execution() {
+        return Err(
+            "The method `get_pool_state` can only be called as non-replicated query call."
+                .to_string(),
+        );
+    }
+    Ok(bob_pool::get_pool_state())
 }
 
 #[update]

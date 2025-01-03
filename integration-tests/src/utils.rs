@@ -245,7 +245,7 @@ pub(crate) fn set_member_block_cycles(
 }
 
 pub(crate) fn get_pool_state(pic: &PocketIc) -> PoolState {
-    query_candid_as::<_, (PoolState,)>(
+    query_candid_as::<_, (Result<PoolState, String>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         Principal::anonymous(),
@@ -254,6 +254,7 @@ pub(crate) fn get_pool_state(pic: &PocketIc) -> PoolState {
     )
     .unwrap()
     .0
+    .unwrap()
 }
 
 pub(crate) fn get_miner(pic: &PocketIc) -> Option<Principal> {

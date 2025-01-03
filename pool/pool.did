@@ -26,11 +26,15 @@ type PoolState = record {
   miner : opt principal;
   running_state : PoolRunningState;
 };
+type PoolStateResult = variant {
+  Ok : PoolState;
+  Err : text;
+};
 type Result = variant { Ok; Err : text };
 service : {
   get_member_cycles : () -> (MemberCyclesResult) query;
   get_member_rewards : () -> (MemberRewardsResult) query;
-  get_pool_state : () -> (PoolState) query;
+  get_pool_state : () -> (PoolStateResult) query;
   join_pool : (nat64) -> (Result);
   pay_member_rewards : () -> (Result);
   set_member_block_cycles : (nat) -> (Result);
