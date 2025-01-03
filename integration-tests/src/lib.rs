@@ -3,17 +3,17 @@
 mod setup;
 mod utils;
 
-use crate::setup::{deploy_pool, deploy_ready_pool, setup, upgrade_pool, XDR_PERMYRIAD_PER_ICP};
+use crate::setup::{deploy_ready_pool, setup, upgrade_pool, XDR_PERMYRIAD_PER_ICP};
 use crate::utils::{
     bob_balance, cycles_to_e8s, ensure_member_rewards, get_latest_blocks, get_member_cycles,
     get_member_rewards, get_miner, get_pool_state, is_pool_ready, join_native_pool, join_pool,
     mine_block, mine_block_with_round_length, pool_logs, set_member_block_cycles, spawn_miner,
-    start_pool, stop_pool, transfer_to_principal, transfer_topup_pool, update_miner_block_cycles,
-    upgrade_miner, wait_for_stopped_pool,
+    start_pool, stop_pool, transfer_to_principal, update_miner_block_cycles, upgrade_miner,
+    wait_for_stopped_pool,
 };
 use bob_pool::{MemberCycles, PoolRunningState, BOB_POOL_BLOCK_FEE};
 use candid::{Decode, Encode, Principal};
-use pocket_ic::{update_candid_as, CallError, UserError, WasmResult};
+use pocket_ic::{UserError, WasmResult};
 
 // System canister IDs
 
@@ -113,60 +113,6 @@ fn test_native_pool() {
 // Test pool
 
 #[test]
-fn test_pool_not_ready() {
-    let admin = Principal::from_slice(&[0xFF; 29]);
-    let pic = setup(vec![admin]);
-
-    deploy_pool(&pic, admin);
-    assert!(!is_pool_ready(&pic));
-
-    let block_index = transfer_topup_pool(&pic, admin, 100_000_000);
-    let err = update_candid_as::<_, (Result<(), String>,)>(
-        &pic,
-        BOB_POOL_CANISTER_ID,
-        admin,
-        "join_pool",
-        ((block_index),),
-    )
-    .unwrap()
-    .0
-    .unwrap_err();
-    assert!(err.contains("BoB pool canister is not ready; please try again later."));
-
-    assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone()).unwrap().contains("[TRAP]: Failed to init: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000"));
-}
-
-#[test]
-fn test_failed_upgrade_pool() {
-    let admin = Principal::from_slice(&[0xFF; 29]);
-    let pic = setup(vec![admin]);
-
-    deploy_pool(&pic, admin);
-    assert!(!is_pool_ready(&pic));
-    assert!(get_miner(&pic).is_none());
-
-    // avoid rate-limiting errors due to frequent code installation
-    for _ in 0..10 {
-        pic.tick();
-    }
-
-    let err = upgrade_pool(&pic, admin).unwrap_err();
-    match err {
-        CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
-        CallError::UserError(err) => assert!(err.description.contains("No miner found.")),
-    };
-
-    assert_eq!(pool_logs(&pic, admin).len(), 2);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Failed to init: Error from ICP ledger canister: the debit account doesn't have enough funds to complete the transaction, current balance: 0.00000000\n"));
-    assert!(String::from_utf8(pool_logs(&pic, admin)[1].content.clone())
-        .unwrap()
-        .contains("No miner found."));
-}
-
-#[test]
 fn test_join_pool() {
     let admin = Principal::from_slice(&[0xFF; 29]);
     let user_1 = Principal::from_slice(&[0xFE; 29]);
@@ -233,8 +179,6 @@ fn test_upgrade_pool() {
     check_member_cycles(get_member_cycles(&pic, admin).unwrap());
 
     ensure_member_rewards(&pic, admin, 1);
-    join_pool(&pic, admin, join_e8s).unwrap();
-    check_member_cycles(get_member_cycles(&pic, admin).unwrap());
 
     let err = start_pool(&pic, user).unwrap_err();
     assert!(err.contains("The method `start` can only be called by controllers."));
@@ -267,12 +211,16 @@ fn test_upgrade_pool() {
         running_state => panic!("Unexpected pool running state: {:?}", running_state),
     };
 
+    join_pool(&pic, admin, join_e8s).unwrap();
+    check_member_cycles(get_member_cycles(&pic, admin).unwrap());
+
     upgrade_pool(&pic, admin).unwrap();
     assert!(is_pool_ready(&pic));
     assert_eq!(get_miner(&pic).unwrap(), bob_miner);
     check_member_cycles(get_member_cycles(&pic, admin).unwrap());
 
     ensure_member_rewards(&pic, admin, 2);
+
     join_pool(&pic, admin, join_e8s).unwrap();
     check_member_cycles(get_member_cycles(&pic, admin).unwrap());
 
@@ -422,17 +370,19 @@ fn test_pool_rewards() {
         - total_block_cycles;
     assert!(pool_cycles_consumption_per_block <= BOB_POOL_BLOCK_FEE);
 
-    let blocks = get_latest_blocks(&pic);
-    assert_eq!(blocks.len(), num_blocks + 1);
-    for block in blocks.iter().take(num_blocks) {
-        assert!(
-            (total_block_cycles + miner_cycles..=total_block_cycles + 3 * miner_cycles)
-                .contains(&(block.total_cycles_burned.unwrap() as u128))
-        );
-    }
-    for block in blocks.iter().skip(num_blocks) {
-        assert!((miner_cycles..=3 * miner_cycles)
-            .contains(&(block.total_cycles_burned.unwrap() as u128)));
+    let mut blocks = get_latest_blocks(&pic);
+    blocks.reverse();
+    assert_eq!(blocks.len(), num_blocks + 2);
+    for (idx, block) in blocks.into_iter().enumerate() {
+        if idx >= 2 {
+            assert!(
+                (total_block_cycles + miner_cycles..=total_block_cycles + 3 * miner_cycles)
+                    .contains(&(block.total_cycles_burned.unwrap() as u128))
+            );
+        } else {
+            assert!((miner_cycles..=3 * miner_cycles)
+                .contains(&(block.total_cycles_burned.unwrap() as u128)));
+        }
     }
 
     assert_eq!(
@@ -496,7 +446,7 @@ fn test_pool_member_interrupt() {
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
     deploy_ready_pool(&pic, admin);
 
-    let num_blocks = 3;
+    let num_blocks = 2;
     let admin_block_cycles = 30_000_000_000_000;
     let total_block_cycles = admin_block_cycles;
 
@@ -532,10 +482,11 @@ fn test_pool_member_interrupt() {
 
     ensure_member_rewards(&pic, admin, 2 * num_blocks);
 
-    let blocks = get_latest_blocks(&pic);
-    assert_eq!(blocks.len(), 3 * num_blocks + 1);
+    let mut blocks = get_latest_blocks(&pic);
+    blocks.reverse();
+    assert_eq!(blocks.len(), 3 * num_blocks + 2);
     for (idx, block) in blocks.into_iter().enumerate() {
-        if (idx / num_blocks) % 2 == 0 {
+        if idx >= 2 && ((idx - 2) / num_blocks) % 2 == 0 {
             assert!(
                 (total_block_cycles + miner_cycles..=total_block_cycles + 3 * miner_cycles)
                     .contains(&(block.total_cycles_burned.unwrap() as u128))

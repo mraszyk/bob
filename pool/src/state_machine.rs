@@ -28,7 +28,9 @@ pub fn run(delay: Duration) {
     if let PoolRunningState::Running = get_running_state() {
         try_and_log_error(delay, "stage_1", stage_1, ());
     } else {
-        stopped();
+        ic_cdk_timers::set_timer(delay, move || {
+            stopped();
+        });
     }
 }
 
@@ -56,20 +58,22 @@ async fn stage_1(_: ()) -> Result<(), String> {
             block_count, time_since_last_block
         ));
     } else {
-        debug_assert!((120..490).contains(&time_since_last_block));
+        assert!((120..490).contains(&time_since_last_block));
         run(Duration::from_secs(490 - time_since_last_block));
     }
     Ok(())
 }
 
 async fn stage_2(_: ()) -> Result<(), String> {
+    let stats = get_bob_statistics().await?;
+    let time_since_last_block = stats.time_since_last_block;
     let next_block_members = get_next_block_members();
     let total_member_block_cycles = next_block_members
         .iter()
         .map(|(_, block_cycles)| block_cycles)
         .sum();
     if total_member_block_cycles == 0 {
-        run(Duration::from_secs(370));
+        run(Duration::from_secs(490 - time_since_last_block));
         return Ok(());
     }
     let miner = get_miner_canister().unwrap();
@@ -113,6 +117,8 @@ async fn stage_3(total_member_block_cycles: u128) -> Result<(), String> {
             miner_stats.last_round_cyles_burned, total_member_block_cycles
         ));
     }
-    run(Duration::from_secs(0));
+    let stats = get_bob_statistics().await?;
+    let time_since_last_block = stats.time_since_last_block;
+    run(Duration::from_secs(490 - time_since_last_block));
     Ok(())
 }

@@ -1,5 +1,6 @@
+use crate::utils::spawn_pool_miner;
 use crate::{
-    is_pool_ready, BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID,
+    is_pool_ready, start_pool, BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID,
     NNS_CYCLES_MINTING_CANISTER_ID, NNS_GOVERNANCE_CANISTER_ID, NNS_ICP_INDEX_CANISTER_ID,
     NNS_ICP_LEDGER_CANISTER_ID, NNS_ROOT_CANISTER_ID,
 };
@@ -254,13 +255,15 @@ pub(crate) fn deploy_pool(pic: &PocketIc, admin: Principal) {
 pub(crate) fn deploy_ready_pool(pic: &PocketIc, admin: Principal) {
     deploy_pool(pic, admin);
     assert!(!is_pool_ready(pic));
+    spawn_pool_miner(pic, admin).unwrap();
+    start_pool(pic, admin).unwrap();
     while !is_pool_ready(pic) {
         pic.advance_time(Duration::from_secs(1));
         pic.tick();
     }
 }
 
-pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) -> Result<(), CallError> {
+pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) -> Result<(), String> {
     let bob_pool_canister_wasm = get_canister_wasm("bob-pool").to_vec();
     pic.upgrade_canister(
         BOB_POOL_CANISTER_ID,
@@ -268,4 +271,9 @@ pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) -> Result<(), CallE
         Encode!(&()).unwrap(),
         Some(admin),
     )
+    .map_err(|err| match err {
+        CallError::UserError(err) => err.description,
+        CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
+    })?;
+    start_pool(pic, admin)
 }

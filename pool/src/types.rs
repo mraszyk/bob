@@ -18,9 +18,9 @@ pub struct Reward {
 
 #[derive(CandidType, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub enum PoolRunningState {
-    #[default]
     Running,
     Stopping,
+    #[default]
     Stopped,
 }
 

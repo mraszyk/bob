@@ -1,5 +1,5 @@
 pub use crate::bob_calls::{
-    bob_transfer, get_bob_statistics, get_latest_blocks, get_miner_statistics, spawn_miner,
+    bob_transfer, get_bob_statistics, get_latest_blocks, get_miner_statistics,
     update_miner_settings, upgrade_miner,
 };
 pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
@@ -44,10 +44,6 @@ pub const MAINNET_LEDGER_INDEX_CANISTER_ID: Principal =
 pub const MAINNET_CYCLE_MINTER_CANISTER_ID: Principal =
     Principal::from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x01, 0x01]);
 
-thread_local! {
-    static __STATE: RefCell<State> = RefCell::default();
-}
-
 pub fn get_pool_state() -> PoolState {
     PoolState {
         miner: get_miner_canister(),
@@ -55,18 +51,52 @@ pub fn get_pool_state() -> PoolState {
     }
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct State {
-    pub running_state: PoolRunningState,
-    pub principal_guards: BTreeSet<Principal>,
-    pub active_tasks: BTreeSet<TaskType>,
+fn ensure_ready() -> Result<(), String> {
+    get_miner_canister()
+        .map(|_| ())
+        .ok_or("BoB pool canister is not ready; please try again later.".to_string())
 }
 
-pub fn get_running_state() -> PoolRunningState {
-    __STATE.with(|s| s.borrow().running_state)
+pub async fn spawn_miner(block_index: Option<u64>) -> Result<(), String> {
+    let block_index = if let Some(block_index) = block_index {
+        block_index
+    } else {
+        let block_index = transfer(
+            MAINNET_CYCLE_MINTER_CANISTER_ID,
+            Some(MAINNET_BOB_CANISTER_ID),
+            1347768404,
+            100_000_000, // minimum amount of 1ICP (surplus discarded)
+        )
+        .await?;
+        ic_cdk::print(format!(
+            "Sent BoB top up transfer at ICP ledger block index {}.",
+            block_index
+        ));
+        block_index
+    };
+
+    let mut attempts = 0;
+    let max_attempts = 100;
+    loop {
+        attempts += 1;
+        if let Err(err) = fetch_block(block_index).await {
+            if attempts >= max_attempts {
+                return Err(format!("Exceeded maximum number of attempts {} when polling ICP ledger index; last error: {}", max_attempts, err));
+            }
+        } else {
+            break;
+        }
+    }
+
+    let miner = bob_calls::spawn_miner(block_index).await?;
+
+    set_miner_canister(miner);
+
+    Ok(())
 }
 
-pub fn start() {
+pub fn start() -> Result<(), String> {
+    ensure_ready()?;
     match get_running_state() {
         PoolRunningState::Running => (),
         PoolRunningState::Stopping => {
@@ -77,12 +107,28 @@ pub fn start() {
             run(std::time::Duration::from_secs(0));
         }
     };
+    Ok(())
 }
 
 pub fn stop() {
     if let PoolRunningState::Running = get_running_state() {
         stopping();
     }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct State {
+    pub running_state: PoolRunningState,
+    pub principal_guards: BTreeSet<Principal>,
+    pub active_tasks: BTreeSet<TaskType>,
+}
+
+thread_local! {
+    static __STATE: RefCell<State> = RefCell::default();
+}
+
+pub(crate) fn get_running_state() -> PoolRunningState {
+    __STATE.with(|s| s.borrow().running_state)
 }
 
 fn running() {
@@ -103,7 +149,7 @@ pub(crate) fn stopped() {
     });
 }
 
-pub fn mutate_state<F, R>(f: F) -> R
+pub(crate) fn mutate_state<F, R>(f: F) -> R
 where
     F: FnOnce(&mut State) -> R,
 {

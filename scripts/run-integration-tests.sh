@@ -35,9 +35,8 @@ cd integration-tests
 if [[ ! -f pocket-ic || "$(./pocket-ic --version)" != "pocket-ic-server $POCKET_IC_VERSION" ]]
 then
   echo "PocketIC download starting"
-  curl -sLO https://github.com/dfinity/pocketic/releases/download/$POCKET_IC_VERSION/pocket-ic-x86_64-$PLATFORM.gz || exit 1
-  gzip -df pocket-ic-x86_64-$PLATFORM.gz
-  mv pocket-ic-x86_64-$PLATFORM pocket-ic
+  curl -sL https://download.dfinity.systems/ic/d9fe2076f677a08734bed90c67b1c3f4056ed621/binaries/x86_64-$PLATFORM/pocket-ic.gz -o pocket-ic.gz
+  gzip -df pocket-ic.gz
   export POCKET_IC_BIN="$(pwd)/pocket-ic"
   chmod +x pocket-ic
   echo "PocketIC download completed"

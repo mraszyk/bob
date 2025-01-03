@@ -23,13 +23,14 @@ type PoolState = record {
   running_state : PoolRunningState;
 };
 type Result = variant { Ok; Err : text };
-service : () -> {
+service : {
   get_member_cycles : () -> (MemberCyclesResult) query;
   get_member_rewards : () -> (vec MemberReward) query;
   get_pool_state : () -> (PoolState) query;
   join_pool : (nat64) -> (Result);
   pay_member_rewards : () -> (Result);
   set_member_block_cycles : (nat) -> (Result);
-  start : () -> ();
+  spawn_miner : (opt nat64) -> (Result);
+  start : () -> (Result);
   stop : () -> ();
 }

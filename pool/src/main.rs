@@ -1,14 +1,12 @@
 use bob_pool::{
-    add_member_remaining_cycles, fetch_block, get_miner_canister, init_member_rewards,
-    notify_top_up, pay_rewards, run, set_miner_canister, spawn_miner, transfer, GuardPrincipal,
-    MemberCycles, PoolState, Reward, MAINNET_BOB_CANISTER_ID, MAINNET_CYCLE_MINTER_CANISTER_ID,
+    add_member_remaining_cycles, fetch_block, init_member_rewards, notify_top_up, pay_rewards,
+    GuardPrincipal, MemberCycles, PoolState, Reward, MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
 use ic_cdk::api::is_controller;
-use ic_cdk::{init, inspect_message, post_upgrade, query, trap, update};
+use ic_cdk::{inspect_message, query, trap, update};
 use icp_ledger::{AccountIdentifier, Operation, Subaccount};
-use std::time::Duration;
 
 fn main() {}
 
@@ -28,7 +26,7 @@ fn inspect_message() {
         } else {
             accept_message();
         }
-    } else if method == "start" || method == "stop" {
+    } else if method == "spawn_miner" || method == "start" || method == "stop" {
         if is_controller(&ic_cdk::caller()) {
             accept_message();
         } else {
@@ -45,66 +43,9 @@ fn inspect_message() {
     }
 }
 
-async fn do_init() -> Result<Principal, String> {
-    let block_index = transfer(
-        MAINNET_CYCLE_MINTER_CANISTER_ID,
-        Some(MAINNET_BOB_CANISTER_ID),
-        1347768404,
-        100_000_000, // minimum amount of 1ICP (surplus discarded)
-    )
-    .await?;
-    ic_cdk::print(format!(
-        "Sent BoB top up transfer at ICP ledger block index {}.",
-        block_index
-    ));
-
-    while fetch_block(block_index).await.is_err() {}
-
-    let miner = spawn_miner(block_index).await?;
-
-    Ok(miner)
-}
-
-#[init]
-fn init() {
-    ic_cdk_timers::set_timer(Duration::from_secs(0), move || {
-        ic_cdk::spawn(async move {
-            let miner = do_init()
-                .await
-                .unwrap_or_else(|err| trap(&format!("Failed to init: {}", err)));
-            set_miner_canister(miner);
-            run(Duration::from_secs(0));
-        })
-    });
-}
-
-#[post_upgrade]
-fn post_upgrade() {
-    if get_miner_canister().is_none() {
-        trap("No miner found.");
-    }
-    run(Duration::from_secs(0));
-}
-
-#[update]
-fn start() {
-    if !is_controller(&ic_cdk::caller()) {
-        ic_cdk::trap("Only controllers can call `start`.");
-    }
-    bob_pool::start();
-}
-
-#[update]
-fn stop() {
-    if !is_controller(&ic_cdk::caller()) {
-        ic_cdk::trap("Only controllers can call `stop`.");
-    }
-    bob_pool::stop();
-}
-
 #[query]
-fn get_pool_state() -> PoolState {
-    bob_pool::get_pool_state()
+fn get_member_cycles() -> Result<Option<MemberCycles>, String> {
+    Ok(bob_pool::get_member_cycles(ic_cdk::caller()))
 }
 
 #[query]
@@ -112,20 +53,14 @@ fn get_member_rewards() -> Vec<Reward> {
     bob_pool::get_member_rewards(ic_cdk::caller())
 }
 
+#[query]
+fn get_pool_state() -> PoolState {
+    bob_pool::get_pool_state()
+}
+
 #[update]
 async fn pay_member_rewards() -> Result<(), String> {
     pay_rewards(ic_cdk::caller()).await
-}
-
-fn ensure_ready() -> Result<(), String> {
-    get_miner_canister()
-        .map(|_| ())
-        .ok_or("BoB pool canister is not ready; please try again later.".to_string())
-}
-
-#[query]
-fn get_member_cycles() -> Result<Option<MemberCycles>, String> {
-    Ok(bob_pool::get_member_cycles(ic_cdk::caller()))
 }
 
 #[update]
@@ -151,8 +86,31 @@ fn set_member_block_cycles(block_cycles: u128) -> Result<(), String> {
 }
 
 #[update]
+async fn spawn_miner(block_index: Option<u64>) -> Result<(), String> {
+    if !is_controller(&ic_cdk::caller()) {
+        ic_cdk::trap("Only controllers can call `spawn_miner`.");
+    }
+    bob_pool::spawn_miner(block_index).await
+}
+
+#[update]
+fn start() -> Result<(), String> {
+    if !is_controller(&ic_cdk::caller()) {
+        ic_cdk::trap("Only controllers can call `start`.");
+    }
+    bob_pool::start()
+}
+
+#[update]
+fn stop() {
+    if !is_controller(&ic_cdk::caller()) {
+        ic_cdk::trap("Only controllers can call `stop`.");
+    }
+    bob_pool::stop();
+}
+
+#[update]
 async fn join_pool(block_index: u64) -> Result<(), String> {
-    ensure_ready()?;
     let caller = ic_cdk::caller();
     if caller == Principal::anonymous() {
         return Err("Anonymous principal cannot join pool.".to_string());

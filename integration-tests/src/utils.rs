@@ -6,14 +6,14 @@ use crate::{
 use bob_miner_v2::MinerSettings;
 use bob_minter_v2::{Block, Stats};
 use bob_pool::{MemberCycles, PoolRunningState, PoolState, Reward};
-use candid::{Nat, Principal};
+use candid::{Encode, Nat, Principal};
 use ic_ledger_core::block::BlockType;
 use ic_ledger_types::{
     AccountIdentifier, Memo, Subaccount, Tokens, TransferArgs, TransferResult, DEFAULT_SUBACCOUNT,
 };
 use icrc_ledger_types::icrc1::account::Account;
 use pocket_ic::management_canister::CanisterLogRecord;
-use pocket_ic::{query_candid_as, update_candid_as, CallError, PocketIc};
+use pocket_ic::{query_candid_as, update_candid_as, CallError, PocketIc, WasmResult};
 
 pub(crate) fn get_icp_block(pic: &PocketIc, block_index: u64) -> Option<icp_ledger::Block> {
     let get_blocks_args = icrc_ledger_types::icrc3::blocks::GetBlocksRequest {
@@ -326,13 +326,33 @@ pub(crate) fn cycles_to_e8s(amount: u128) -> u64 {
         .unwrap()
 }
 
+pub(crate) fn spawn_pool_miner(pic: &PocketIc, user_id: Principal) -> Result<(), String> {
+    let spawn_miners_args: Option<u64> = None;
+    let bytes = Encode!(&spawn_miners_args).unwrap();
+    let msg_id = pic
+        .submit_call(BOB_POOL_CANISTER_ID, user_id, "spawn_miner", bytes)
+        .unwrap();
+    let res = loop {
+        if let Some(res) = pic.ingress_status(msg_id.clone()) {
+            break res;
+        }
+        pic.advance_time(std::time::Duration::from_secs(1));
+        pic.tick();
+    };
+    res.map(|res| match res {
+        WasmResult::Reply(_) => (),
+        WasmResult::Reject(msg) => panic!("Unexpected reject: {}", msg),
+    })
+    .map_err(|err| err.description)
+}
+
 pub(crate) fn start_pool(pic: &PocketIc, user_id: Principal) -> Result<(), String> {
-    update_candid_as::<_, ((),)>(pic, BOB_POOL_CANISTER_ID, user_id, "start", ((),))
-        .map(|res| res.0)
+    update_candid_as::<_, (Result<(), String>,)>(pic, BOB_POOL_CANISTER_ID, user_id, "start", ((),))
         .map_err(|err| match err {
             CallError::UserError(err) => err.description,
             CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
-        })
+        })?
+        .0
 }
 
 pub(crate) fn stop_pool(pic: &PocketIc, user_id: Principal) -> Result<(), String> {
