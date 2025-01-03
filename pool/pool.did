@@ -1,0 +1,48 @@
+type MemberCycles = record {
+  block : nat;
+  pending : nat;
+  remaining : nat;
+};
+type MemberCyclesResult = variant {
+  Ok : MemberCycles;
+  Err : text;
+};
+type MemberReward = record {
+  timestamp : nat64;
+  cycles_burnt : nat;
+  bob_reward : nat;
+  bob_block_index : opt nat64;
+};
+type MemberRewardsResult = variant {
+  Ok : vec MemberReward;
+  Err : text;
+};
+type PoolRunningState = variant {
+  Running;
+  Stopping;
+  Stopped;
+};
+type PoolState = record {
+  miner : opt principal;
+  running_state : PoolRunningState;
+  num_active_members : nat64;
+  total_active_member_block_cycles : nat;
+  total_cycles_burnt : nat;
+  total_bob_rewards : nat;
+};
+type PoolStateResult = variant {
+  Ok : PoolState;
+  Err : text;
+};
+type Result = variant { Ok; Err : text };
+service : {
+  get_member_cycles : () -> (MemberCyclesResult) query;
+  get_member_rewards : () -> (MemberRewardsResult) query;
+  get_pool_state : () -> (PoolStateResult) query;
+  join_pool : (nat64) -> (Result);
+  pay_member_rewards : () -> (Result);
+  set_member_block_cycles : (nat) -> (Result);
+  spawn_miner : (opt nat64) -> (Result);
+  start : () -> (Result);
+  stop : () -> (Result);
+}

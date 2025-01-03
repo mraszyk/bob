@@ -1,19 +1,22 @@
+use crate::utils::spawn_pool_miner;
 use crate::{
-    BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, NNS_CYCLES_MINTING_CANISTER_ID,
-    NNS_GOVERNANCE_CANISTER_ID, NNS_ICP_INDEX_CANISTER_ID, NNS_ICP_LEDGER_CANISTER_ID,
-    NNS_ROOT_CANISTER_ID,
+    is_pool_ready, start_pool, BOB_CANISTER_ID, BOB_LEDGER_CANISTER_ID, BOB_POOL_CANISTER_ID,
+    NNS_CYCLES_MINTING_CANISTER_ID, NNS_GOVERNANCE_CANISTER_ID, NNS_ICP_INDEX_CANISTER_ID,
+    NNS_ICP_LEDGER_CANISTER_ID, NNS_ROOT_CANISTER_ID,
 };
 use candid::{CandidType, Encode, Principal};
 use ic_icrc1_ledger::{InitArgsBuilder, LedgerArgument};
 use ic_ledger_types::Tokens;
 use ic_ledger_types::{AccountIdentifier, DEFAULT_SUBACCOUNT};
 use icrc_ledger_types::icrc1::account::Account;
-use pocket_ic::{update_candid_as, PocketIc, PocketIcBuilder};
+use pocket_ic::{update_candid_as, CallError, PocketIc, PocketIcBuilder};
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use std::time::SystemTime;
+
+pub const XDR_PERMYRIAD_PER_ICP: u64 = 9_0000; // 9.00 SDR per ICP
 
 // System canister init args
 
@@ -159,7 +162,7 @@ fn deploy_cmc(pic: &PocketIc) {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
-        xdr_permyriad_per_icp: 7_8000, // 7.80 SDR per ICP
+        xdr_permyriad_per_icp: XDR_PERMYRIAD_PER_ICP,
     };
     update_candid_as::<_, (Result<(), String>,)>(
         pic,
@@ -232,4 +235,42 @@ pub(crate) fn setup(icp_holders: Vec<Principal>) -> PocketIc {
     deploy_bob_canisters(&pic);
 
     pic
+}
+
+pub(crate) fn deploy_pool(pic: &PocketIc, admin: Principal) {
+    let bob_pool_canister_id = pic
+        .create_canister_with_id(Some(admin), None, BOB_POOL_CANISTER_ID)
+        .unwrap();
+    assert_eq!(bob_pool_canister_id, BOB_POOL_CANISTER_ID);
+    pic.add_cycles(bob_pool_canister_id, 10_000_000_000_000);
+    let bob_pool_canister_wasm = get_canister_wasm("bob-pool").to_vec();
+    pic.install_canister(
+        bob_pool_canister_id,
+        bob_pool_canister_wasm,
+        Encode!(&()).unwrap(),
+        Some(admin),
+    );
+}
+
+pub(crate) fn deploy_ready_pool(pic: &PocketIc, admin: Principal) {
+    deploy_pool(pic, admin);
+    assert!(!is_pool_ready(pic));
+    spawn_pool_miner(pic, admin).unwrap();
+    start_pool(pic, admin).unwrap();
+    assert!(is_pool_ready(pic));
+}
+
+pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) -> Result<(), String> {
+    let bob_pool_canister_wasm = get_canister_wasm("bob-pool").to_vec();
+    pic.upgrade_canister(
+        BOB_POOL_CANISTER_ID,
+        bob_pool_canister_wasm,
+        Encode!(&()).unwrap(),
+        Some(admin),
+    )
+    .map_err(|err| match err {
+        CallError::UserError(err) => err.description,
+        CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
+    })?;
+    start_pool(pic, admin)
 }
