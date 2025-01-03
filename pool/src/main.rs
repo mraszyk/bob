@@ -88,7 +88,7 @@ fn set_member_block_cycles(block_cycles: u128) -> Result<(), String> {
 #[update]
 async fn spawn_miner(block_index: Option<u64>) -> Result<(), String> {
     if !is_controller(&ic_cdk::caller()) {
-        ic_cdk::trap("Only controllers can call `spawn_miner`.");
+        return Err("Only controllers can call `spawn_miner`.".to_string());
     }
     bob_pool::spawn_miner(block_index).await
 }
@@ -96,17 +96,18 @@ async fn spawn_miner(block_index: Option<u64>) -> Result<(), String> {
 #[update]
 fn start() -> Result<(), String> {
     if !is_controller(&ic_cdk::caller()) {
-        ic_cdk::trap("Only controllers can call `start`.");
+        return Err("Only controllers can call `start`.".to_string());
     }
     bob_pool::start()
 }
 
 #[update]
-fn stop() {
+fn stop() -> Result<(), String> {
     if !is_controller(&ic_cdk::caller()) {
-        ic_cdk::trap("Only controllers can call `stop`.");
+        return Err("Only controllers can call `stop`.".to_string());
     }
     bob_pool::stop();
+    Ok(())
 }
 
 #[update]

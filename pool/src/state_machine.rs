@@ -58,7 +58,6 @@ async fn stage_1(_: ()) -> Result<(), String> {
             block_count, time_since_last_block
         ));
     } else {
-        assert!((120..490).contains(&time_since_last_block));
         run(Duration::from_secs(490 - time_since_last_block));
     }
     Ok(())

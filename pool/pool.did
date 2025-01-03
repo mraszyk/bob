@@ -32,5 +32,5 @@ service : {
   set_member_block_cycles : (nat) -> (Result);
   spawn_miner : (opt nat64) -> (Result);
   start : () -> (Result);
-  stop : () -> ();
+  stop : () -> (Result);
 }

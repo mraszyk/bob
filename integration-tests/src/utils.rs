@@ -356,12 +356,12 @@ pub(crate) fn start_pool(pic: &PocketIc, user_id: Principal) -> Result<(), Strin
 }
 
 pub(crate) fn stop_pool(pic: &PocketIc, user_id: Principal) -> Result<(), String> {
-    update_candid_as::<_, ((),)>(pic, BOB_POOL_CANISTER_ID, user_id, "stop", ((),))
-        .map(|res| res.0)
+    update_candid_as::<_, (Result<(), String>,)>(pic, BOB_POOL_CANISTER_ID, user_id, "stop", ((),))
         .map_err(|err| match err {
             CallError::UserError(err) => err.description,
             CallError::Reject(msg) => panic!("Unexpected reject: {}", msg),
-        })
+        })?
+        .0
 }
 
 pub(crate) fn wait_for_stopped_pool(pic: &PocketIc) {

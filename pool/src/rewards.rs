@@ -12,7 +12,7 @@ pub async fn check_rewards() -> Result<(), String> {
     let latest_blocks = get_latest_blocks().await?;
     let mut total_bob_rewards: u128 = 0;
     let last_reward_timestamp = get_last_reward_timestamp();
-    let mut max_reward_timestamp = 0;
+    let mut max_reward_timestamp = last_reward_timestamp;
     for block in latest_blocks {
         if block.to == ic_cdk::id() && block.timestamp > last_reward_timestamp {
             total_bob_rewards = total_bob_rewards.checked_add(block.rewards.into()).unwrap();
@@ -28,7 +28,6 @@ pub async fn check_rewards() -> Result<(), String> {
             .collect();
         push_member_rewards(new_rewards);
         reset_member_pending_cycles(members);
-        assert_ne!(max_reward_timestamp, 0);
         set_last_reward_timestamp(max_reward_timestamp);
     }
     Ok(())
