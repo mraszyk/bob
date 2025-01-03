@@ -365,7 +365,10 @@ fn test_pool_rewards() {
 
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 3);
-    assert_eq!(pool_state.total_active_member_block_cycles, total_block_cycles);
+    assert_eq!(
+        pool_state.total_active_member_block_cycles,
+        total_block_cycles
+    );
     assert_eq!(pool_state.total_cycles_burnt, 0);
     assert_eq!(pool_state.total_bob_rewards, 0);
 
@@ -381,9 +384,18 @@ fn test_pool_rewards() {
 
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 3);
-    assert_eq!(pool_state.total_active_member_block_cycles, total_block_cycles);
-    assert_eq!(pool_state.total_cycles_burnt, total_block_cycles * (num_blocks as u128 - 1));
-    assert_eq!(pool_state.total_bob_rewards, (60_000_000_000 - 3_000_000) * (num_blocks as u128 - 1));
+    assert_eq!(
+        pool_state.total_active_member_block_cycles,
+        total_block_cycles
+    );
+    assert_eq!(
+        pool_state.total_cycles_burnt,
+        total_block_cycles * (num_blocks as u128 - 1)
+    );
+    assert_eq!(
+        pool_state.total_bob_rewards,
+        (60_000_000_000 - 3_000_000) * (num_blocks as u128 - 1)
+    );
 
     ensure_member_rewards(&pic, admin, num_blocks);
     ensure_member_rewards(&pic, user_1, num_blocks);
@@ -392,8 +404,14 @@ fn test_pool_rewards() {
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 0);
     assert_eq!(pool_state.total_active_member_block_cycles, 0);
-    assert_eq!(pool_state.total_cycles_burnt, total_block_cycles * num_blocks as u128);
-    assert_eq!(pool_state.total_bob_rewards, (60_000_000_000 - 3_000_000) * num_blocks as u128);
+    assert_eq!(
+        pool_state.total_cycles_burnt,
+        total_block_cycles * num_blocks as u128
+    );
+    assert_eq!(
+        pool_state.total_bob_rewards,
+        (60_000_000_000 - 3_000_000) * num_blocks as u128
+    );
 
     let pool_cycles_consumption = pool_cycles - pic.cycle_balance(BOB_POOL_CANISTER_ID);
     let pool_cycles_consumption_per_block = (pool_miner_extra_cycles + pool_cycles_consumption)
@@ -461,12 +479,10 @@ fn test_pool_rewards() {
 }
 
 #[test]
-fn test_pool_member_interrupt() {
+fn test_pool_full_interrupt() {
     let admin = Principal::from_slice(&[0xFF; 29]);
-    let user_1 = Principal::from_slice(&[0xFE; 29]);
-    let user_2 = Principal::from_slice(&[0xFD; 29]);
     let user = Principal::from_slice(&[0xFC; 29]);
-    let pic = setup(vec![admin, user_1, user_2, user]);
+    let pic = setup(vec![admin, user]);
 
     let miner = spawn_miner(&pic, user, 100_000_000);
     let miner_cycles = 15_000_000_000;
@@ -492,6 +508,8 @@ fn test_pool_member_interrupt() {
 
     set_member_block_cycles(&pic, admin, 0).unwrap();
 
+    let pool_cycles = pic.cycle_balance(BOB_POOL_CANISTER_ID);
+
     for _ in 0..num_blocks {
         mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
     }
@@ -506,6 +524,10 @@ fn test_pool_member_interrupt() {
     );
 
     set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+
+    let pool_cycles_consumption = pool_cycles - pic.cycle_balance(BOB_POOL_CANISTER_ID);
+    let pool_cycles_consumption_per_block = pool_cycles_consumption / num_blocks as u128;
+    assert!(pool_cycles_consumption_per_block < 100_000_000);
 
     ensure_member_rewards(&pic, admin, 2 * num_blocks);
 
@@ -527,7 +549,8 @@ fn test_pool_member_interrupt() {
 
     assert_eq!(
         bob_balance(&pic, admin) as u128,
-        2 * (60_000_000_000 - 1_000_000) * num_blocks as u128
+        2 * (60_000_000_000 - 1_000_000) * admin_block_cycles * num_blocks as u128
+            / total_block_cycles
     );
 
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
@@ -537,6 +560,131 @@ fn test_pool_member_interrupt() {
         member_cycles.remaining
             + 2 * (admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128,
         member_cycles_admin.remaining
+    );
+
+    check_pool_logs(&pic, admin);
+}
+
+#[test]
+fn test_pool_member_interrupt() {
+    let admin = Principal::from_slice(&[0xFF; 29]);
+    let user_1 = Principal::from_slice(&[0xFE; 29]);
+    let user = Principal::from_slice(&[0xFC; 29]);
+    let pic = setup(vec![admin, user_1, user]);
+
+    let miner = spawn_miner(&pic, user, 100_000_000);
+    let miner_cycles = 15_000_000_000;
+    update_miner_block_cycles(&pic, user, miner, miner_cycles);
+
+    transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
+    deploy_ready_pool(&pic, admin);
+
+    let num_blocks = 2;
+    let admin_block_cycles = 30_000_000_000_000;
+    let user_1_block_cycles = 30_000_000_000_000;
+    let total_block_cycles = admin_block_cycles + user_1_block_cycles;
+    join_pool(
+        &pic,
+        admin,
+        cycles_to_e8s(2 * (admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
+    )
+    .unwrap();
+    join_pool(
+        &pic,
+        user_1,
+        cycles_to_e8s(3 * (user_1_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
+    )
+    .unwrap();
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+    set_member_block_cycles(&pic, user_1, user_1_block_cycles).unwrap();
+
+    let member_cycles_admin = get_member_cycles(&pic, admin).unwrap();
+    let member_cycles_user_1 = get_member_cycles(&pic, user_1).unwrap();
+
+    ensure_member_rewards(&pic, admin, num_blocks);
+
+    set_member_block_cycles(&pic, admin, 0).unwrap();
+
+    for _ in 0..num_blocks {
+        mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
+    }
+    ensure_member_rewards(&pic, user_1, 2 * num_blocks);
+
+    assert_eq!(get_member_rewards(&pic, admin).len(), num_blocks);
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, 0);
+    assert_eq!(member_cycles.pending, 0);
+    assert_eq!(
+        member_cycles.remaining
+            + (admin_block_cycles + BOB_POOL_BLOCK_FEE / 2) * num_blocks as u128,
+        member_cycles_admin.remaining
+    );
+
+    assert_eq!(get_member_rewards(&pic, user_1).len(), 2 * num_blocks);
+    let member_cycles = get_member_cycles(&pic, user_1).unwrap();
+    assert_eq!(member_cycles.block, user_1_block_cycles);
+    assert_eq!(member_cycles.pending, 0);
+    assert_eq!(
+        member_cycles.remaining
+            + (user_1_block_cycles + BOB_POOL_BLOCK_FEE / 2) * num_blocks as u128
+            + (user_1_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128,
+        member_cycles_user_1.remaining
+    );
+
+    set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
+
+    ensure_member_rewards(&pic, admin, 2 * num_blocks);
+    ensure_member_rewards(&pic, user_1, 3 * num_blocks);
+
+    let mut blocks = get_latest_blocks(&pic);
+    assert!(blocks.len() < 10);
+    blocks.reverse();
+    assert_eq!(blocks.len(), 3 * num_blocks + 2);
+    for (idx, block) in blocks.into_iter().enumerate() {
+        if idx >= 2 && ((idx - 2) / num_blocks) % 2 == 0 {
+            assert!(
+                (total_block_cycles + miner_cycles..=total_block_cycles + 3 * miner_cycles)
+                    .contains(&(block.total_cycles_burned.unwrap() as u128))
+            );
+        } else if idx >= 2 {
+            assert!(
+                (user_1_block_cycles + miner_cycles..=user_1_block_cycles + 3 * miner_cycles)
+                    .contains(&(block.total_cycles_burned.unwrap() as u128))
+            );
+        } else {
+            assert!((miner_cycles..=3 * miner_cycles)
+                .contains(&(block.total_cycles_burned.unwrap() as u128)));
+        }
+    }
+
+    assert_eq!(
+        bob_balance(&pic, admin) as u128,
+        2 * (60_000_000_000 - 2_000_000) * admin_block_cycles * num_blocks as u128
+            / total_block_cycles
+    );
+    assert_eq!(
+        bob_balance(&pic, user_1) as u128,
+        2 * (60_000_000_000 - 2_000_000) * user_1_block_cycles * num_blocks as u128
+            / total_block_cycles
+            + (60_000_000_000 - 1_000_000) * num_blocks as u128
+    );
+
+    let member_cycles = get_member_cycles(&pic, admin).unwrap();
+    assert_eq!(member_cycles.block, admin_block_cycles);
+    assert_eq!(member_cycles.pending, 0);
+    assert_eq!(
+        member_cycles.remaining
+            + 2 * (admin_block_cycles + BOB_POOL_BLOCK_FEE / 2) * num_blocks as u128,
+        member_cycles_admin.remaining
+    );
+    let member_cycles = get_member_cycles(&pic, user_1).unwrap();
+    assert_eq!(member_cycles.block, user_1_block_cycles);
+    assert_eq!(member_cycles.pending, 0);
+    assert_eq!(
+        member_cycles.remaining
+            + 2 * (user_1_block_cycles + BOB_POOL_BLOCK_FEE / 2) * num_blocks as u128
+            + (user_1_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128,
+        member_cycles_user_1.remaining
     );
 
     check_pool_logs(&pic, admin);
