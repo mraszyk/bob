@@ -14,9 +14,9 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
-pub const XDR_PERMYRIAD_PER_ICP: u64 = 7_8000; // 7.80 SDR per ICP
+pub const XDR_PERMYRIAD_PER_ICP: u64 = 9_0000; // 9.00 SDR per ICP
 
 // System canister init args
 
@@ -242,7 +242,7 @@ pub(crate) fn deploy_pool(pic: &PocketIc, admin: Principal) {
         .create_canister_with_id(Some(admin), None, BOB_POOL_CANISTER_ID)
         .unwrap();
     assert_eq!(bob_pool_canister_id, BOB_POOL_CANISTER_ID);
-    pic.add_cycles(bob_pool_canister_id, 100_000_000_000_000);
+    pic.add_cycles(bob_pool_canister_id, 10_000_000_000_000);
     let bob_pool_canister_wasm = get_canister_wasm("bob-pool").to_vec();
     pic.install_canister(
         bob_pool_canister_id,
@@ -257,10 +257,7 @@ pub(crate) fn deploy_ready_pool(pic: &PocketIc, admin: Principal) {
     assert!(!is_pool_ready(pic));
     spawn_pool_miner(pic, admin).unwrap();
     start_pool(pic, admin).unwrap();
-    while !is_pool_ready(pic) {
-        pic.advance_time(Duration::from_secs(1));
-        pic.tick();
-    }
+    assert!(is_pool_ready(pic));
 }
 
 pub(crate) fn upgrade_pool(pic: &PocketIc, admin: Principal) -> Result<(), String> {

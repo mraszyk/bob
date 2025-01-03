@@ -5,11 +5,11 @@ mod utils;
 
 use crate::setup::{deploy_ready_pool, setup, upgrade_pool, XDR_PERMYRIAD_PER_ICP};
 use crate::utils::{
-    bob_balance, cycles_to_e8s, ensure_member_rewards, get_latest_blocks, get_member_cycles,
-    get_member_rewards, get_miner, get_pool_state, is_pool_ready, join_native_pool, join_pool,
-    mine_block, mine_block_with_round_length, pool_logs, set_member_block_cycles, spawn_miner,
-    start_pool, stop_pool, transfer_to_principal, update_miner_block_cycles, upgrade_miner,
-    wait_for_stopped_pool,
+    bob_balance, check_pool_logs, cycles_to_e8s, ensure_member_rewards, get_latest_blocks,
+    get_member_cycles, get_member_rewards, get_miner, get_pool_state, is_pool_ready,
+    join_native_pool, join_pool, mine_block, mine_block_with_round_length, set_member_block_cycles,
+    spawn_miner, start_pool, stop_pool, transfer_to_principal, update_miner_block_cycles,
+    upgrade_miner, wait_for_stopped_pool,
 };
 use bob_pool::{MemberCycles, PoolRunningState, BOB_POOL_BLOCK_FEE};
 use candid::{Decode, Encode, Principal};
@@ -148,10 +148,7 @@ fn test_join_pool() {
         );
     }
 
-    assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index 4."));
+    check_pool_logs(&pic, admin);
 }
 
 #[test]
@@ -228,10 +225,7 @@ fn test_upgrade_pool() {
     join_pool(&pic, admin, join_e8s).unwrap();
     check_member_cycles(get_member_cycles(&pic, admin).unwrap());
 
-    assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index 5."));
+    check_pool_logs(&pic, admin);
 }
 
 #[test]
@@ -259,7 +253,9 @@ fn test_set_member_block_cycles() {
     assert_eq!(member_cycles.block, 15_000_000_000_u128);
 
     let err = set_member_block_cycles(&pic, admin, 14_000_000_000_u128).unwrap_err();
-    assert!(err.contains("The number of block cycles 14000000000 is too small."));
+    assert!(err.contains(
+        "The number of block cycles 14000000000 is less than the minimum of 15000000000."
+    ));
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.block, 15_000_000_000_u128);
 
@@ -271,10 +267,7 @@ fn test_set_member_block_cycles() {
     let member_cycles = get_member_cycles(&pic, admin).unwrap();
     assert_eq!(member_cycles.block, 15_000_000_000_u128);
 
-    assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index 2."));
+    check_pool_logs(&pic, admin);
 }
 
 #[test]
@@ -291,7 +284,7 @@ fn test_pool_inactive_by_default() {
     deploy_ready_pool(&pic, admin);
 
     let pool_cycles = pic.cycle_balance(BOB_POOL_CANISTER_ID);
-    let num_blocks = 10;
+    let num_blocks = 8;
     for _ in 0..num_blocks {
         mine_block(&pic);
     }
@@ -300,16 +293,14 @@ fn test_pool_inactive_by_default() {
     assert!(pool_cycles_consumption_per_block < 100_000_000);
 
     let blocks = get_latest_blocks(&pic);
+    assert!(blocks.len() < 10);
     assert_eq!(blocks.len(), num_blocks);
     for block in blocks {
         assert!((miner_cycles..=3 * miner_cycles)
             .contains(&(block.total_cycles_burned.unwrap() as u128)));
     }
 
-    assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index 5."));
+    check_pool_logs(&pic, admin);
 }
 
 #[test]
@@ -336,7 +327,6 @@ fn test_pool_rewards() {
     let user_1_block_cycles = 40_000_000_000_000;
     let user_2_block_cycles = 50_000_000_000_000;
     let total_block_cycles = admin_block_cycles + user_1_block_cycles + user_2_block_cycles;
-
     join_pool(
         &pic,
         admin,
@@ -355,7 +345,6 @@ fn test_pool_rewards() {
         cycles_to_e8s((user_2_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
     )
     .unwrap();
-
     set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
     set_member_block_cycles(&pic, user_1, user_1_block_cycles).unwrap();
     set_member_block_cycles(&pic, user_2, user_2_block_cycles).unwrap();
@@ -375,6 +364,7 @@ fn test_pool_rewards() {
     assert!(pool_cycles_consumption_per_block <= BOB_POOL_BLOCK_FEE);
 
     let mut blocks = get_latest_blocks(&pic);
+    assert!(blocks.len() < 10);
     blocks.reverse();
     assert_eq!(blocks.len(), num_blocks + 2);
     for (idx, block) in blocks.into_iter().enumerate() {
@@ -429,10 +419,7 @@ fn test_pool_rewards() {
         member_cycles_user_2.remaining
     );
 
-    assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index 7."));
+    check_pool_logs(&pic, admin);
 }
 
 #[test]
@@ -453,14 +440,12 @@ fn test_pool_member_interrupt() {
     let num_blocks = 2;
     let admin_block_cycles = 30_000_000_000_000;
     let total_block_cycles = admin_block_cycles;
-
     join_pool(
         &pic,
         admin,
         cycles_to_e8s(2 * (admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
     )
     .unwrap();
-
     set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
 
     let member_cycles_admin = get_member_cycles(&pic, admin).unwrap();
@@ -487,6 +472,7 @@ fn test_pool_member_interrupt() {
     ensure_member_rewards(&pic, admin, 2 * num_blocks);
 
     let mut blocks = get_latest_blocks(&pic);
+    assert!(blocks.len() < 10);
     blocks.reverse();
     assert_eq!(blocks.len(), 3 * num_blocks + 2);
     for (idx, block) in blocks.into_iter().enumerate() {
@@ -515,10 +501,7 @@ fn test_pool_member_interrupt() {
         member_cycles_admin.remaining
     );
 
-    assert_eq!(pool_logs(&pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(&pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index 7."));
+    check_pool_logs(&pic, admin);
 }
 
 #[test]
@@ -530,20 +513,22 @@ fn test_simultaneous_reward_payments() {
     let miner = spawn_miner(&pic, user, 100_000_000);
     let miner_cycles = 15_000_000_000;
     update_miner_block_cycles(&pic, user, miner, miner_cycles);
-    mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
 
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
     deploy_ready_pool(&pic, admin);
 
-    join_pool(&pic, admin, 1_000_000_000).unwrap();
-
-    let admin_block_cycles = 3_000_000_000_000;
+    let num_blocks = 1;
+    let admin_block_cycles = 30_000_000_000_000;
+    join_pool(
+        &pic,
+        admin,
+        cycles_to_e8s((admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
+    )
+    .unwrap();
     set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
 
-    mine_block_with_round_length(&pic, std::time::Duration::from_secs(5));
-
     while get_member_rewards(&pic, admin).is_empty() {
-        pic.advance_time(std::time::Duration::from_secs(1));
+        pic.advance_time(std::time::Duration::from_secs(5));
         pic.tick();
     }
 
@@ -583,18 +568,19 @@ fn test_simultaneous_reward_payments() {
     let member_rewards = get_member_rewards(&pic, admin);
     assert_eq!(member_rewards.len(), 1);
     assert!(member_rewards[0].bob_block_index.is_some());
+
+    check_pool_logs(&pic, admin);
 }
 
 #[test]
 fn test_join_pool_with_rewards() {
     let admin = Principal::from_slice(&[0xFF; 29]);
-    let user = Principal::from_slice(&[0xFC; 29]);
+    let user = Principal::from_slice(&[0xFE; 29]);
     let pic = setup(vec![admin, user]);
 
     let miner = spawn_miner(&pic, user, 100_000_000);
     let miner_cycles = 15_000_000_000;
     update_miner_block_cycles(&pic, user, miner, miner_cycles);
-    mine_block(&pic);
 
     transfer_to_principal(&pic, admin, BOB_POOL_CANISTER_ID, 100_010_000);
     deploy_ready_pool(&pic, admin);
@@ -607,21 +593,20 @@ fn test_join_pool_with_rewards() {
         cycles_to_e8s((admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
     )
     .unwrap();
-
     set_member_block_cycles(&pic, admin, admin_block_cycles).unwrap();
 
     ensure_member_rewards(&pic, admin, num_blocks);
 
     let admin_rewards = get_member_rewards(&pic, admin);
-
     join_pool(
         &pic,
         admin,
         cycles_to_e8s((admin_block_cycles + BOB_POOL_BLOCK_FEE) * num_blocks as u128),
     )
     .unwrap();
-
     assert_eq!(get_member_rewards(&pic, admin).len(), admin_rewards.len());
 
     ensure_member_rewards(&pic, admin, num_blocks);
+
+    check_pool_logs(&pic, admin);
 }

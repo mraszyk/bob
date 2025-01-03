@@ -84,16 +84,18 @@ async fn pay_member_rewards() -> Result<(), String> {
 #[update]
 fn set_member_block_cycles(block_cycles: u128) -> Result<(), String> {
     ensure_caller_pool_member()?;
-    if block_cycles != 0 && block_cycles < 15_000_000_000 {
+    let min_block_cycles = 15_000_000_000;
+    if block_cycles != 0 && block_cycles < min_block_cycles {
         return Err(format!(
-            "The number of block cycles {} is too small.",
-            block_cycles
+            "The number of block cycles {} is less than the minimum of {}.",
+            block_cycles, min_block_cycles
         ));
     }
-    if block_cycles % 1_000_000 != 0 {
+    let block_cycles_mod = 1_000_000;
+    if block_cycles % block_cycles_mod != 0 {
         return Err(format!(
             "The number of block cycles {} is not a multiple of {}.",
-            block_cycles, 1000000_u128
+            block_cycles, block_cycles_mod
         ));
     }
     bob_pool::set_member_block_cycles(ic_cdk::caller(), block_cycles);

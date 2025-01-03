@@ -182,11 +182,13 @@ pub(crate) fn mine_block_with_round_length(pic: &PocketIc, step: std::time::Dura
         let new_stats = get_stats(pic);
         if new_stats.block_count > old_stats.block_count {
             assert_eq!(new_stats.block_count, old_stats.block_count + 1);
-            while !get_stats(pic).pending_blocks.is_empty() {
-                pic.tick();
-            }
             break;
         }
+    }
+
+    while !get_stats(pic).pending_blocks.is_empty() {
+        pic.advance_time(std::time::Duration::from_secs(1));
+        pic.tick();
     }
 }
 
@@ -195,7 +197,7 @@ pub(crate) fn mine_block(pic: &PocketIc) {
 }
 
 pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
-    update_candid_as::<_, (Nat,)>(
+    let bob_balance_nat = update_candid_as::<_, (Nat,)>(
         pic,
         BOB_LEDGER_CANISTER_ID,
         user_id,
@@ -206,10 +208,8 @@ pub(crate) fn bob_balance(pic: &PocketIc, user_id: Principal) -> u64 {
         },),
     )
     .unwrap()
-    .0
-     .0
-    .try_into()
-    .unwrap()
+    .0;
+    bob_balance_nat.0.try_into().unwrap()
 }
 
 pub(crate) fn get_member_cycles(
@@ -268,6 +268,13 @@ pub(crate) fn is_pool_ready(pic: &PocketIc) -> bool {
 pub(crate) fn pool_logs(pic: &PocketIc, user_id: Principal) -> Vec<CanisterLogRecord> {
     pic.fetch_canister_logs(BOB_POOL_CANISTER_ID, user_id)
         .unwrap()
+}
+
+pub(crate) fn check_pool_logs(pic: &PocketIc, admin: Principal) {
+    assert_eq!(pool_logs(pic, admin).len(), 1);
+    assert!(String::from_utf8(pool_logs(pic, admin)[0].content.clone())
+        .unwrap()
+        .contains("Sent BoB top up transfer at ICP ledger block index"));
 }
 
 pub(crate) fn update_miner_block_cycles(
