@@ -4,11 +4,11 @@ pub use crate::bob_calls::{
 };
 pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
 pub use crate::memory::{
-    add_member_remaining_cycles, commit_block_members, get_and_set_block_count,
-    get_last_reward_timestamp, get_member_cycles, get_member_rewards, get_member_to_pending_cycles,
-    get_miner_canister, get_next_block_members, init_member_rewards, push_member_rewards,
-    reset_member_pending_cycles, set_last_reward_timestamp, set_member_block_cycles,
-    set_member_rewards, set_miner_canister,
+    add_member_remaining_cycles, commit_block_members, get_all_member_rewards,
+    get_and_set_block_count, get_last_reward_timestamp, get_member_cycles, get_member_rewards,
+    get_member_to_pending_cycles, get_miner_canister, get_next_block_members, init_member_rewards,
+    push_member_rewards, reset_member_pending_cycles, set_last_reward_timestamp,
+    set_member_block_cycles, set_member_rewards, set_miner_canister,
 };
 pub use crate::rewards::{check_rewards, pay_rewards};
 pub use crate::state_machine::run;
@@ -45,9 +45,33 @@ pub const MAINNET_CYCLE_MINTER_CANISTER_ID: Principal =
     Principal::from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x01, 0x01]);
 
 pub fn get_pool_state() -> PoolState {
+    let next_block_members = get_next_block_members();
+    let num_active_members = next_block_members.len() as u64;
+    let total_active_member_block_cycles = next_block_members
+        .iter()
+        .map(|(_, block_cycles)| block_cycles)
+        .sum();
+    let rewards = get_all_member_rewards();
+    let total_cycles_burnt = rewards
+        .values()
+        .map(|rewards| {
+            rewards
+                .iter()
+                .map(|reward| reward.cycles_burnt)
+                .sum::<u128>()
+        })
+        .sum();
+    let total_bob_rewards = rewards
+        .values()
+        .map(|rewards| rewards.iter().map(|reward| reward.bob_reward).sum::<u128>())
+        .sum();
     PoolState {
         miner: get_miner_canister(),
         running_state: get_running_state(),
+        num_active_members,
+        total_active_member_block_cycles,
+        total_cycles_burnt,
+        total_bob_rewards,
     }
 }
 

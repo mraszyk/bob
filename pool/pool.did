@@ -25,6 +25,10 @@ type PoolRunningState = variant {
 type PoolState = record {
   miner : opt principal;
   running_state : PoolRunningState;
+  num_active_members : nat64;
+  total_active_member_block_cycles : nat;
+  total_cycles_burnt : nat;
+  total_bob_rewards : nat;
 };
 type PoolStateResult = variant {
   Ok : PoolState;

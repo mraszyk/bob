@@ -7,6 +7,7 @@ use ic_stable_structures::{DefaultMemoryImpl as DefMem, StableBTreeMap, StableCe
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 
 #[derive(Default, Ord, PartialOrd, Clone, Eq, PartialEq)]
 struct Cbor<T>(pub T)
@@ -125,7 +126,7 @@ pub fn get_next_block_members() -> Vec<(Principal, u128)> {
         s.borrow()
             .iter()
             .filter_map(|(member, mc)| {
-                if mc.0.block + BOB_POOL_BLOCK_FEE <= mc.0.remaining {
+                if mc.0.block != 0 && mc.0.block + BOB_POOL_BLOCK_FEE <= mc.0.remaining {
                     Some((member, mc.0.block))
                 } else {
                     None
@@ -191,6 +192,15 @@ pub fn init_member_rewards(member: Principal) {
             s.borrow_mut().insert(member, Cbor(vec![]));
         }
     });
+}
+
+pub fn get_all_member_rewards() -> BTreeMap<Principal, Vec<Reward>> {
+    MEMBER_TO_REWARDS.with(|s| {
+        s.borrow()
+            .iter()
+            .map(|(member, rewards)| (member, rewards.0))
+            .collect()
+    })
 }
 
 pub fn get_member_rewards(member: Principal) -> Vec<Reward> {
