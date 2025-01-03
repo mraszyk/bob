@@ -579,6 +579,10 @@ fn test_simultaneous_reward_payments() {
     if let Err(err) = res_2 {
         assert!(err.contains("Concurrency error"));
     }
+
+    let member_rewards = get_member_rewards(&pic, admin);
+    assert_eq!(member_rewards.len(), 1);
+    assert!(member_rewards[0].bob_block_index.is_some());
 }
 
 #[test]

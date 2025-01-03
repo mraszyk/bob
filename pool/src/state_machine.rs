@@ -25,13 +25,13 @@ where
 }
 
 pub fn run(delay: Duration) {
-    if let PoolRunningState::Running = get_running_state() {
-        try_and_log_error(delay, "stage_1", stage_1, ());
-    } else {
-        ic_cdk_timers::set_timer(delay, move || {
+    ic_cdk_timers::set_timer(delay, move || {
+        if let PoolRunningState::Running = get_running_state() {
+            try_and_log_error(Duration::from_secs(0), "stage_1", stage_1, ());
+        } else {
             stopped();
-        });
-    }
+        }
+    });
 }
 
 async fn stage_1(_: ()) -> Result<(), String> {

@@ -72,21 +72,20 @@ pub async fn spawn_miner(block_index: Option<u64>) -> Result<(), String> {
             "Sent BoB top up transfer at ICP ledger block index {}.",
             block_index
         ));
+        let mut attempts = 0;
+        let max_attempts = 100;
+        loop {
+            attempts += 1;
+            if let Err(err) = fetch_block(block_index).await {
+                if attempts >= max_attempts {
+                    return Err(format!("Exceeded maximum number of attempts {} when polling ICP ledger index; last error: {}", max_attempts, err));
+                }
+            } else {
+                break;
+            }
+        }
         block_index
     };
-
-    let mut attempts = 0;
-    let max_attempts = 100;
-    loop {
-        attempts += 1;
-        if let Err(err) = fetch_block(block_index).await {
-            if attempts >= max_attempts {
-                return Err(format!("Exceeded maximum number of attempts {} when polling ICP ledger index; last error: {}", max_attempts, err));
-            }
-        } else {
-            break;
-        }
-    }
 
     let miner = bob_calls::spawn_miner(block_index).await?;
 
