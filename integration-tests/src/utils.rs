@@ -271,10 +271,16 @@ pub(crate) fn pool_logs(pic: &PocketIc, user_id: Principal) -> Vec<CanisterLogRe
 }
 
 pub(crate) fn check_pool_logs(pic: &PocketIc, admin: Principal) {
-    assert_eq!(pool_logs(pic, admin).len(), 1);
-    assert!(String::from_utf8(pool_logs(pic, admin)[0].content.clone())
-        .unwrap()
-        .contains("Sent BoB top up transfer at ICP ledger block index"));
+    let logs = pool_logs(pic, admin);
+    assert!((1..=2).contains(&logs.len()));
+    let msgs: Vec<_> = logs
+        .into_iter()
+        .map(|log| String::from_utf8(log.content).unwrap())
+        .collect();
+    assert!(msgs[0].contains("Sent BoB top up transfer at ICP ledger block index"));
+    if msgs.len() > 1 {
+        assert!(msgs[1].contains("WARN(stage_1): skipping block 1442"));
+    }
 }
 
 pub(crate) fn update_miner_block_cycles(

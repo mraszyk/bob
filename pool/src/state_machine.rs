@@ -93,6 +93,7 @@ async fn stage_1(_: ()) -> Result<(), String> {
             block_count, time_since_last_block
         ));
     } else {
+        ic_cdk::print(format!("WARN(stage_1): skipping block {}", block_count));
         run(Duration::from_secs(490 - time_since_last_block));
     }
     Ok(())

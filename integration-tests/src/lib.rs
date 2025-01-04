@@ -924,6 +924,7 @@ fn test_frozen_bob() {
         .any(|msg| msg.contains("Canister 6lnhz-oaaaa-aaaas-aabkq-cai is out of cycles")));
     assert!(logs.iter().all(|msg| msg
         .contains("Sent BoB top up transfer at ICP ledger block index")
+        || msg.contains("WARN(stage_1): skipping block 1442")
         || msg.contains("Canister 6lnhz-oaaaa-aaaas-aabkq-cai is out of cycles")));
 }
 
@@ -1031,7 +1032,10 @@ fn test_frozen_pool() {
         .any(|msg| msg.contains(&format!("Canister {} is out of cycles", miner))));
     assert!(logs.iter().all(|msg| msg
         .contains("Sent BoB top up transfer at ICP ledger block index")
+        || msg.contains("WARN(stage_1): skipping block 1442")
         || msg.contains("WARN(stage_1): skipped blocks 1445..<1446")
+        || msg.contains("WARN(stage_1): skipping block 1446")
+        || msg.contains("WARN(stage_1): skipping block 1447")
         || msg.contains(&format!("Canister {} is out of cycles", miner))
         || msg.contains("ERR(stage_3): Last cycles burned")));
 }
