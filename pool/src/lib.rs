@@ -14,7 +14,7 @@ pub use crate::rewards::{check_rewards, pay_rewards};
 pub use crate::state_machine::run;
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
 pub use crate::types::{
-    GetPoolRewardsInput, MemberCycles, MemberReward, PoolReward, PoolRunningState, PoolState,
+    GetRewardsInput, MemberCycles, MemberReward, PoolReward, PoolRunningState, PoolState,
 };
 
 mod bob_calls;

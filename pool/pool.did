@@ -1,3 +1,7 @@
+type GetRewardsInput = record {
+  start_idx : nat64;
+  max_cnt : opt nat64;
+};
 type MemberCycles = record {
   block : nat;
   pending : nat;
@@ -16,10 +20,6 @@ type MemberReward = record {
 type MemberRewardsResult = variant {
   Ok : vec MemberReward;
   Err : text;
-};
-type GetPoolRewardsInput = record {
-  start_idx : nat64;
-  max_cnt : opt nat64;
 };
 type PoolReward = record {
   timestamp : nat64;
@@ -51,8 +51,8 @@ type PoolStateResult = variant {
 type Result = variant { Ok; Err : text };
 service : {
   get_member_cycles : () -> (MemberCyclesResult) query;
-  get_member_rewards : () -> (MemberRewardsResult) query;
-  get_pool_rewards : (GetPoolRewardsInput) -> (PoolRewardsResult) query;
+  get_member_rewards : (GetRewardsInput) -> (MemberRewardsResult) query;
+  get_pool_rewards : (GetRewardsInput) -> (PoolRewardsResult) query;
   get_pool_state : () -> (PoolStateResult) query;
   join_pool : (nat64) -> (Result);
   pay_member_rewards : () -> (Result);

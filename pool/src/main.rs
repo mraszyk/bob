@@ -1,6 +1,6 @@
 use bob_pool::{
     add_member_remaining_cycles, fetch_block, init_member_rewards, notify_top_up, pay_rewards,
-    GetPoolRewardsInput, GuardPrincipal, MemberCycles, MemberReward, PoolReward, PoolState,
+    GetRewardsInput, GuardPrincipal, MemberCycles, MemberReward, PoolReward, PoolState,
     MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
@@ -59,17 +59,10 @@ fn get_member_cycles() -> Result<MemberCycles, String> {
     Ok(bob_pool::get_member_cycles(ic_cdk::caller()).unwrap())
 }
 
-#[query]
-fn get_member_rewards() -> Result<Vec<MemberReward>, String> {
-    ensure_caller_pool_member()?;
-    Ok(bob_pool::get_member_rewards(ic_cdk::caller()))
-}
-
-#[query]
-fn get_pool_rewards(input: GetPoolRewardsInput) -> Result<Vec<PoolReward>, String> {
+fn validate_rewards_input(input: GetRewardsInput) -> Result<u64, String> {
     if in_replicated_execution() {
         return Err(
-            "The method `get_pool_rewards` can only be called as non-replicated query call."
+            "The methods `get_member_rewards` and `get_pool_rewards` can only be called as non-replicated query call."
                 .to_string(),
         );
     }
@@ -77,11 +70,31 @@ fn get_pool_rewards(input: GetPoolRewardsInput) -> Result<Vec<PoolReward>, Strin
     let cnt = input.max_cnt.unwrap_or(max_pool_rewards_cnt);
     if cnt > max_pool_rewards_cnt {
         return Err(format!(
-            "Cannot request more than {} pool rewards in a single call.",
+            "Cannot request more than {} rewards in a single call.",
             max_pool_rewards_cnt
         ));
     }
-    Ok(bob_pool::get_pool_rewards(input.start_idx, cnt))
+    Ok(cnt)
+}
+
+#[query]
+fn get_member_rewards(input: GetRewardsInput) -> Result<Vec<MemberReward>, String> {
+    ensure_caller_pool_member()?;
+    let start_idx = input.start_idx;
+    let cnt = validate_rewards_input(input)?;
+    let member_rewards = bob_pool::get_member_rewards(ic_cdk::caller())
+        .into_iter()
+        .skip(start_idx as usize)
+        .take(cnt as usize)
+        .collect();
+    Ok(member_rewards)
+}
+
+#[query]
+fn get_pool_rewards(input: GetRewardsInput) -> Result<Vec<PoolReward>, String> {
+    let start_idx = input.start_idx;
+    let cnt = validate_rewards_input(input)?;
+    Ok(bob_pool::get_pool_rewards(start_idx, cnt))
 }
 
 #[query]

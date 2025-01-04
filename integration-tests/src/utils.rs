@@ -6,7 +6,7 @@ use crate::{
 use bob_miner_v2::MinerSettings;
 use bob_minter_v2::{Block, Stats};
 use bob_pool::{
-    GetPoolRewardsInput, MemberCycles, MemberReward, PoolReward, PoolRunningState, PoolState,
+    GetRewardsInput, MemberCycles, MemberReward, PoolReward, PoolRunningState, PoolState,
 };
 use candid::{Encode, Nat, Principal};
 use ic_ledger_core::block::BlockType;
@@ -264,13 +264,13 @@ pub(crate) fn get_pool_rewards(
     start_idx: u64,
     max_cnt: Option<u64>,
 ) -> Result<Vec<PoolReward>, String> {
-    let pool_rewards_input = GetPoolRewardsInput { start_idx, max_cnt };
+    let get_rewards_input = GetRewardsInput { start_idx, max_cnt };
     query_candid_as::<_, (Result<Vec<PoolReward>, String>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         Principal::anonymous(),
         "get_pool_rewards",
-        (pool_rewards_input,),
+        (get_rewards_input,),
     )
     .unwrap()
     .0
@@ -323,12 +323,16 @@ pub(crate) fn update_miner_block_cycles(
 }
 
 pub(crate) fn get_member_rewards(pic: &PocketIc, user_id: Principal) -> Vec<MemberReward> {
+    let get_rewards_input = GetRewardsInput {
+        start_idx: 0,
+        max_cnt: None,
+    };
     query_candid_as::<_, (Result<Vec<MemberReward>, String>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         user_id,
         "get_member_rewards",
-        ((),),
+        (get_rewards_input,),
     )
     .unwrap()
     .0

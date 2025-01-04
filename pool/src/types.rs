@@ -1,6 +1,12 @@
 use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct GetRewardsInput {
+    pub start_idx: u64,
+    pub max_cnt: Option<u64>,
+}
+
 #[derive(CandidType, Debug, Default, Serialize, Deserialize)]
 pub struct MemberCycles {
     pub block: u128,
@@ -14,12 +20,6 @@ pub struct MemberReward {
     pub cycles_burnt: u128,
     pub bob_reward: u128,
     pub bob_block_index: Option<u64>,
-}
-
-#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct GetPoolRewardsInput {
-    pub start_idx: u64,
-    pub max_cnt: Option<u64>,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
