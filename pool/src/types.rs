@@ -29,6 +29,7 @@ pub struct PoolState {
     pub miner: Option<Principal>,
     pub running_state: PoolRunningState,
     pub num_active_members: u64,
+    pub cycles_burnt_since_last_reward: u128,
     pub total_active_member_block_cycles: u128,
     pub total_cycles_burnt: u128,
     pub total_bob_rewards: u128,

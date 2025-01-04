@@ -52,15 +52,20 @@ pub fn get_pool_state() -> PoolState {
         .map(|(_, block_cycles)| block_cycles)
         .sum();
     let rewards = get_all_member_rewards();
-    let total_cycles_burnt = rewards
-        .values()
-        .map(|rewards| {
-            rewards
-                .iter()
-                .map(|reward| reward.cycles_burnt)
-                .sum::<u128>()
-        })
+    let cycles_burnt_since_last_reward = get_member_to_pending_cycles()
+        .into_iter()
+        .map(|(_, cycles_burnt)| cycles_burnt)
         .sum();
+    let total_cycles_burnt = cycles_burnt_since_last_reward
+        + rewards
+            .values()
+            .map(|rewards| {
+                rewards
+                    .iter()
+                    .map(|reward| reward.cycles_burnt)
+                    .sum::<u128>()
+            })
+            .sum::<u128>();
     let total_bob_rewards = rewards
         .values()
         .map(|rewards| rewards.iter().map(|reward| reward.bob_reward).sum::<u128>())
@@ -69,6 +74,7 @@ pub fn get_pool_state() -> PoolState {
         miner: get_miner_canister(),
         running_state: get_running_state(),
         num_active_members,
+        cycles_burnt_since_last_reward,
         total_active_member_block_cycles,
         total_cycles_burnt,
         total_bob_rewards,

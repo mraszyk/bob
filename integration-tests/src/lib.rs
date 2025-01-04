@@ -325,6 +325,7 @@ fn test_pool_rewards() {
 
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 0);
+    assert_eq!(pool_state.cycles_burnt_since_last_reward, 0);
     assert_eq!(pool_state.total_active_member_block_cycles, 0);
     assert_eq!(pool_state.total_cycles_burnt, 0);
     assert_eq!(pool_state.total_bob_rewards, 0);
@@ -355,6 +356,7 @@ fn test_pool_rewards() {
 
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 0);
+    assert_eq!(pool_state.cycles_burnt_since_last_reward, 0);
     assert_eq!(pool_state.total_active_member_block_cycles, 0);
     assert_eq!(pool_state.total_cycles_burnt, 0);
     assert_eq!(pool_state.total_bob_rewards, 0);
@@ -365,6 +367,7 @@ fn test_pool_rewards() {
 
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 3);
+    assert_eq!(pool_state.cycles_burnt_since_last_reward, 0);
     assert_eq!(
         pool_state.total_active_member_block_cycles,
         total_block_cycles
@@ -384,6 +387,7 @@ fn test_pool_rewards() {
 
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 3);
+    assert_eq!(pool_state.cycles_burnt_since_last_reward, 0);
     assert_eq!(
         pool_state.total_active_member_block_cycles,
         total_block_cycles
@@ -397,12 +401,34 @@ fn test_pool_rewards() {
         (60_000_000_000 - 3_000_000) * (num_blocks as u128 - 1)
     );
 
+    while get_pool_state(&pic).cycles_burnt_since_last_reward == 0 {
+        pic.advance_time(std::time::Duration::from_secs(5));
+        pic.tick();
+    }
+
+    let pool_state = get_pool_state(&pic);
+    assert_eq!(pool_state.num_active_members, 0);
+    assert_eq!(
+        pool_state.cycles_burnt_since_last_reward,
+        total_block_cycles
+    );
+    assert_eq!(pool_state.total_active_member_block_cycles, 0);
+    assert_eq!(
+        pool_state.total_cycles_burnt,
+        total_block_cycles * num_blocks as u128
+    );
+    assert_eq!(
+        pool_state.total_bob_rewards,
+        (60_000_000_000 - 3_000_000) * (num_blocks as u128 - 1)
+    );
+
     ensure_member_rewards(&pic, admin, num_blocks);
     ensure_member_rewards(&pic, user_1, num_blocks);
     ensure_member_rewards(&pic, user_2, num_blocks);
 
     let pool_state = get_pool_state(&pic);
     assert_eq!(pool_state.num_active_members, 0);
+    assert_eq!(pool_state.cycles_burnt_since_last_reward, 0);
     assert_eq!(pool_state.total_active_member_block_cycles, 0);
     assert_eq!(
         pool_state.total_cycles_burnt,

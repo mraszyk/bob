@@ -26,6 +26,7 @@ type PoolState = record {
   miner : opt principal;
   running_state : PoolRunningState;
   num_active_members : nat64;
+  cycles_burnt_since_last_reward : nat;
   total_active_member_block_cycles : nat;
   total_cycles_burnt : nat;
   total_bob_rewards : nat;
