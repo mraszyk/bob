@@ -76,6 +76,12 @@ async fn stage_1(_: ()) -> Result<(), String> {
     let stats = get_bob_statistics().await?;
     let block_count = stats.block_count;
     let last_block_count = get_and_set_block_count(block_count);
+    if block_count == last_block_count {
+        return Err(format!(
+            "Trying to participate in the same block {} again.",
+            block_count
+        ));
+    }
     if 0 < last_block_count && last_block_count + 1 < block_count {
         ic_cdk::print(format!(
             "WARN(stage_1): skipped blocks {}..<{}",

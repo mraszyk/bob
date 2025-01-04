@@ -1037,5 +1037,6 @@ fn test_frozen_pool() {
         || msg.contains("WARN(stage_1): skipping block 1446")
         || msg.contains("WARN(stage_1): skipping block 1447")
         || msg.contains(&format!("Canister {} is out of cycles", miner))
-        || msg.contains("ERR(stage_3): Last cycles burned")));
+        || msg.contains("ERR(stage_3): Last cycles burned")
+        || msg.contains("ERR(stage_1): Trying to participate in the same block 1447 again.")));
 }
