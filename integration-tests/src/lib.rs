@@ -6,9 +6,9 @@ mod utils;
 use crate::setup::{deploy_ready_pool, setup, upgrade_pool, XDR_PERMYRIAD_PER_ICP};
 use crate::utils::{
     bob_balance, check_pool_logs, cycles_to_e8s, ensure_member_rewards, get_latest_blocks,
-    get_member_cycles, get_member_rewards, get_miner, get_pool_state, is_pool_ready,
-    join_native_pool, join_pool, mine_block, mine_block_with_round_length, pool_logs,
-    set_member_block_cycles, spawn_miner, start_pool, stop_pool, transfer_to_principal,
+    get_member_cycles, get_member_rewards, get_miner, get_pool_rewards, get_pool_state,
+    is_pool_ready, join_native_pool, join_pool, mine_block, mine_block_with_round_length,
+    pool_logs, set_member_block_cycles, spawn_miner, start_pool, stop_pool, transfer_to_principal,
     update_miner_block_cycles, upgrade_miner, wait_for_stopped_pool,
 };
 use bob_pool::{MemberCycles, PoolRunningState, BOB_POOL_BLOCK_FEE};
@@ -375,6 +375,9 @@ fn test_pool_rewards() {
     assert_eq!(pool_state.total_cycles_burnt, 0);
     assert_eq!(pool_state.total_bob_rewards, 0);
 
+    let pool_rewards = get_pool_rewards(&pic, 0, None).unwrap();
+    assert!(pool_rewards.is_empty());
+
     let member_cycles_admin = get_member_cycles(&pic, admin).unwrap();
     let member_cycles_user_1 = get_member_cycles(&pic, user_1).unwrap();
     let member_cycles_user_2 = get_member_cycles(&pic, user_2).unwrap();
@@ -438,6 +441,27 @@ fn test_pool_rewards() {
         pool_state.total_bob_rewards,
         (60_000_000_000 - 3_000_000) * num_blocks as u128
     );
+
+    let admin_rewards = get_member_rewards(&pic, admin);
+    let pool_rewards = get_pool_rewards(&pic, 0, None).unwrap();
+    assert_eq!(pool_rewards.len(), num_blocks);
+    for i in 0..num_blocks {
+        assert_eq!(pool_rewards[i].timestamp, admin_rewards[i].timestamp);
+        assert_eq!(
+            pool_rewards[i].cycles_burnt_since_last_reward,
+            total_block_cycles
+        );
+        assert_eq!(pool_rewards[i].bob_reward, 60_000_000_000);
+    }
+    let pool_rewards_suffix = get_pool_rewards(&pic, 1, None).unwrap();
+    assert!(!pool_rewards_suffix.is_empty());
+    assert_eq!(pool_rewards_suffix.len(), num_blocks - 1);
+    for i in 0..num_blocks - 1 {
+        assert_eq!(
+            pool_rewards_suffix[i].timestamp,
+            pool_rewards[i + 1].timestamp
+        );
+    }
 
     let pool_cycles_consumption = pool_cycles - pic.cycle_balance(BOB_POOL_CANISTER_ID);
     let pool_cycles_consumption_per_block = (pool_miner_extra_cycles + pool_cycles_consumption)

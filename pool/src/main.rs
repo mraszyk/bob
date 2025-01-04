@@ -1,6 +1,7 @@
 use bob_pool::{
     add_member_remaining_cycles, fetch_block, init_member_rewards, notify_top_up, pay_rewards,
-    GuardPrincipal, MemberCycles, MemberReward, PoolState, MAINNET_CYCLE_MINTER_CANISTER_ID,
+    GuardPrincipal, MemberCycles, MemberReward, PoolReward, PoolRewardsInput, PoolState,
+    MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
@@ -62,6 +63,25 @@ fn get_member_cycles() -> Result<MemberCycles, String> {
 fn get_member_rewards() -> Result<Vec<MemberReward>, String> {
     ensure_caller_pool_member()?;
     Ok(bob_pool::get_member_rewards(ic_cdk::caller()))
+}
+
+#[query]
+fn get_pool_rewards(input: PoolRewardsInput) -> Result<Vec<PoolReward>, String> {
+    if in_replicated_execution() {
+        return Err(
+            "The method `get_pool_rewards` can only be called as non-replicated query call."
+                .to_string(),
+        );
+    }
+    let max_pool_rewards_cnt = 1000;
+    let cnt = input.max_cnt.unwrap_or(max_pool_rewards_cnt);
+    if cnt > max_pool_rewards_cnt {
+        return Err(format!(
+            "Cannot request more than {} pool rewards in a single call.",
+            max_pool_rewards_cnt
+        ));
+    }
+    Ok(bob_pool::get_pool_rewards(input.start_idx, cnt))
 }
 
 #[query]

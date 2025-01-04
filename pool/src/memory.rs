@@ -1,9 +1,11 @@
-use crate::{MemberCycles, MemberReward, BOB_POOL_BLOCK_FEE};
+use crate::{MemberCycles, MemberReward, PoolReward, BOB_POOL_BLOCK_FEE};
 use candid::Principal;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::DefaultMemoryImpl;
-use ic_stable_structures::{DefaultMemoryImpl as DefMem, StableBTreeMap, StableCell, Storable};
+use ic_stable_structures::{
+    DefaultMemoryImpl as DefMem, StableBTreeMap, StableCell, StableLog, Storable,
+};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -41,8 +43,10 @@ struct State {
 // NOTE: ensure that all memory ids are unique and
 // do not change across upgrades!
 const POOL_STATE_MEM_ID: MemoryId = MemoryId::new(0);
-const MEMBER_TO_CYCLES_MEM_ID: MemoryId = MemoryId::new(1);
-const MEMBER_TO_REWARDS_MEM_ID: MemoryId = MemoryId::new(2);
+const POOL_REWARDS_INDEX_MEM_ID: MemoryId = MemoryId::new(1);
+const POOL_REWARDS_DATA_MEM_ID: MemoryId = MemoryId::new(2);
+const MEMBER_TO_CYCLES_MEM_ID: MemoryId = MemoryId::new(3);
+const MEMBER_TO_REWARDS_MEM_ID: MemoryId = MemoryId::new(4);
 
 type VM = VirtualMemory<DefMem>;
 
@@ -54,6 +58,11 @@ thread_local! {
     static POOL_STATE: RefCell<StableCell<Cbor<State>, VM>> =
         MEMORY_MANAGER.with(|mm| {
         RefCell::new(StableCell::init(mm.borrow().get(POOL_STATE_MEM_ID), Cbor(State::default())).unwrap())
+    });
+
+    static POOL_REWARDS: RefCell<StableLog<Cbor<PoolReward>, VM, VM>> =
+        MEMORY_MANAGER.with(|mm| {
+        RefCell::new(StableLog::init(mm.borrow().get(POOL_REWARDS_INDEX_MEM_ID), mm.borrow().get(POOL_REWARDS_DATA_MEM_ID)).unwrap())
     });
 
     static MEMBER_TO_CYCLES: RefCell<StableBTreeMap<Principal, Cbor<MemberCycles>, VM>> =
@@ -98,6 +107,16 @@ pub fn set_last_reward_timestamp(last_reward_timestamp: u64) {
         let mut state = s.borrow().get().clone();
         state.0.last_reward_timestamp = last_reward_timestamp;
         s.borrow_mut().set(state).unwrap();
+    });
+}
+
+pub fn get_pool_reward(idx: u64) -> Option<PoolReward> {
+    POOL_REWARDS.with(|s| s.borrow().get(idx).map(|cbor_reward| cbor_reward.0))
+}
+
+pub fn append_pool_reward(pool_reward: PoolReward) {
+    POOL_REWARDS.with(|s| {
+        s.borrow_mut().append(&Cbor(pool_reward)).unwrap();
     });
 }
 
@@ -176,7 +195,7 @@ pub fn reset_member_pending_cycles(members: Vec<Principal>) {
     });
 }
 
-pub fn push_member_rewards(rewards: Vec<(Principal, MemberReward)>) {
+pub fn append_member_rewards(rewards: Vec<(Principal, MemberReward)>) {
     MEMBER_TO_REWARDS.with(|s| {
         for (member, reward) in rewards {
             let mut rewards = s.borrow().get(&member).unwrap();

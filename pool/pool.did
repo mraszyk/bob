@@ -17,6 +17,19 @@ type MemberRewardsResult = variant {
   Ok : vec MemberReward;
   Err : text;
 };
+type PoolRewardsInput = record {
+  start_idx : nat64;
+  max_cnt : opt nat64;
+};
+type PoolReward = record {
+  timestamp : nat64;
+  cycles_burnt_since_last_reward : nat;
+  bob_reward: nat;
+};
+type PoolRewardsResult = variant {
+  Ok : vec PoolReward;
+  Err : text;
+};
 type PoolRunningState = variant {
   Running;
   Stopping;
@@ -39,6 +52,7 @@ type Result = variant { Ok; Err : text };
 service : {
   get_member_cycles : () -> (MemberCyclesResult) query;
   get_member_rewards : () -> (MemberRewardsResult) query;
+  get_pool_rewards : (PoolRewardsInput) -> (PoolRewardsResult) query;
   get_pool_state : () -> (PoolStateResult) query;
   join_pool : (nat64) -> (Result);
   pay_member_rewards : () -> (Result);

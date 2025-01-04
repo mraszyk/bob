@@ -1,8 +1,8 @@
 use crate::{
-    bob_transfer, get_last_reward_timestamp, get_latest_blocks, get_member_rewards,
-    get_member_to_pending_cycles, push_member_rewards, reset_member_pending_cycles,
-    set_last_reward_timestamp, set_member_rewards, GuardPrincipal, MemberReward, TaskGuard,
-    TaskType,
+    append_member_rewards, append_pool_reward, bob_transfer, get_last_reward_timestamp,
+    get_latest_blocks, get_member_rewards, get_member_to_pending_cycles,
+    reset_member_pending_cycles, set_last_reward_timestamp, set_member_rewards, GuardPrincipal,
+    MemberReward, PoolReward, TaskGuard, TaskType,
 };
 use candid::Principal;
 use std::cmp::max;
@@ -25,20 +25,22 @@ pub async fn check_rewards() -> Result<(), String> {
         }
     }
     if total_bob_rewards > 0 {
-        let new_rewards: Vec<(Principal, MemberReward)> = compute_rewards(total_bob_rewards);
-        let members: Vec<Principal> = new_rewards
+        let (member_rewards, pool_reward): (Vec<(Principal, MemberReward)>, PoolReward) =
+            compute_rewards(total_bob_rewards);
+        let members: Vec<Principal> = member_rewards
             .iter()
             .map(|(member, _)| member)
             .copied()
             .collect();
-        push_member_rewards(new_rewards);
+        append_member_rewards(member_rewards);
+        append_pool_reward(pool_reward);
         reset_member_pending_cycles(members);
         set_last_reward_timestamp(max_reward_timestamp);
     }
     Ok(())
 }
 
-fn compute_rewards(total_bob_brutto: u128) -> Vec<(Principal, MemberReward)> {
+fn compute_rewards(total_bob_brutto: u128) -> (Vec<(Principal, MemberReward)>, PoolReward) {
     let member_to_pending_cycles: Vec<(Principal, u128)> = get_member_to_pending_cycles();
     let total_pending_cycles: u128 = member_to_pending_cycles
         .iter()
@@ -48,7 +50,7 @@ fn compute_rewards(total_bob_brutto: u128) -> Vec<(Principal, MemberReward)> {
     let total_bob_fee: u128 = num_members.checked_mul(1_000_000).unwrap();
     let total_bob_netto: u128 = total_bob_brutto.checked_sub(total_bob_fee).unwrap();
     let current_time: u64 = ic_cdk::api::time();
-    member_to_pending_cycles
+    let member_rewards = member_to_pending_cycles
         .into_iter()
         .map(|(member, pending_cycles)| {
             let bob_reward: u128 = total_bob_netto
@@ -66,7 +68,13 @@ fn compute_rewards(total_bob_brutto: u128) -> Vec<(Principal, MemberReward)> {
                 },
             )
         })
-        .collect()
+        .collect();
+    let pool_reward = PoolReward {
+        timestamp: current_time,
+        cycles_burnt_since_last_reward: total_pending_cycles,
+        bob_reward: total_bob_brutto,
+    };
+    (member_rewards, pool_reward)
 }
 
 pub async fn pay_rewards(member: Principal) -> Result<(), String> {

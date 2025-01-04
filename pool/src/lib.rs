@@ -4,16 +4,18 @@ pub use crate::bob_calls::{
 };
 pub use crate::guard::{GuardPrincipal, TaskGuard, TaskType};
 pub use crate::memory::{
-    add_member_remaining_cycles, commit_block_members, get_all_member_rewards,
-    get_and_set_block_count, get_last_reward_timestamp, get_member_cycles, get_member_rewards,
-    get_member_to_pending_cycles, get_miner_canister, get_next_block_members, init_member_rewards,
-    push_member_rewards, reset_member_pending_cycles, set_last_reward_timestamp,
+    add_member_remaining_cycles, append_member_rewards, append_pool_reward, commit_block_members,
+    get_all_member_rewards, get_and_set_block_count, get_last_reward_timestamp, get_member_cycles,
+    get_member_rewards, get_member_to_pending_cycles, get_miner_canister, get_next_block_members,
+    get_pool_reward, init_member_rewards, reset_member_pending_cycles, set_last_reward_timestamp,
     set_member_block_cycles, set_member_rewards, set_miner_canister,
 };
 pub use crate::rewards::{check_rewards, pay_rewards};
 pub use crate::state_machine::run;
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
-pub use crate::types::{MemberCycles, MemberReward, PoolRunningState, PoolState};
+pub use crate::types::{
+    MemberCycles, MemberReward, PoolReward, PoolRewardsInput, PoolRunningState, PoolState,
+};
 
 mod bob_calls;
 mod guard;
@@ -43,6 +45,18 @@ pub const MAINNET_LEDGER_INDEX_CANISTER_ID: Principal =
 
 pub const MAINNET_CYCLE_MINTER_CANISTER_ID: Principal =
     Principal::from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x01, 0x01]);
+
+pub fn get_pool_rewards(start_idx: u64, cnt: u64) -> Vec<PoolReward> {
+    let mut res = vec![];
+    for idx in start_idx..start_idx + cnt {
+        if let Some(pool_reward) = get_pool_reward(idx) {
+            res.push(pool_reward);
+        } else {
+            break;
+        }
+    }
+    res
+}
 
 pub fn get_pool_state() -> PoolState {
     let next_block_members = get_next_block_members();

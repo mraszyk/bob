@@ -16,6 +16,19 @@ pub struct MemberReward {
     pub bob_block_index: Option<u64>,
 }
 
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct PoolRewardsInput {
+    pub start_idx: u64,
+    pub max_cnt: Option<u64>,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct PoolReward {
+    pub timestamp: u64,
+    pub cycles_burnt_since_last_reward: u128,
+    pub bob_reward: u128,
+}
+
 #[derive(CandidType, Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub enum PoolRunningState {
     Running,

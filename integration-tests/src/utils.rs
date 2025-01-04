@@ -5,7 +5,9 @@ use crate::{
 };
 use bob_miner_v2::MinerSettings;
 use bob_minter_v2::{Block, Stats};
-use bob_pool::{MemberCycles, MemberReward, PoolRunningState, PoolState};
+use bob_pool::{
+    MemberCycles, MemberReward, PoolReward, PoolRewardsInput, PoolRunningState, PoolState,
+};
 use candid::{Encode, Nat, Principal};
 use ic_ledger_core::block::BlockType;
 use ic_ledger_types::{
@@ -255,6 +257,23 @@ pub(crate) fn get_pool_state(pic: &PocketIc) -> PoolState {
     .unwrap()
     .0
     .unwrap()
+}
+
+pub(crate) fn get_pool_rewards(
+    pic: &PocketIc,
+    start_idx: u64,
+    max_cnt: Option<u64>,
+) -> Result<Vec<PoolReward>, String> {
+    let pool_rewards_input = PoolRewardsInput { start_idx, max_cnt };
+    query_candid_as::<_, (Result<Vec<PoolReward>, String>,)>(
+        pic,
+        BOB_POOL_CANISTER_ID,
+        Principal::anonymous(),
+        "get_pool_rewards",
+        (pool_rewards_input,),
+    )
+    .unwrap()
+    .0
 }
 
 pub(crate) fn get_miner(pic: &PocketIc) -> Option<Principal> {
