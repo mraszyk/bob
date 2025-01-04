@@ -17,7 +17,7 @@ pub struct MemberReward {
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct PoolRewardsInput {
+pub struct GetPoolRewardsInput {
     pub start_idx: u64,
     pub max_cnt: Option<u64>,
 }

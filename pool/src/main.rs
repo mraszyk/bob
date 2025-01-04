@@ -1,6 +1,6 @@
 use bob_pool::{
     add_member_remaining_cycles, fetch_block, init_member_rewards, notify_top_up, pay_rewards,
-    GuardPrincipal, MemberCycles, MemberReward, PoolReward, PoolRewardsInput, PoolState,
+    GetPoolRewardsInput, GuardPrincipal, MemberCycles, MemberReward, PoolReward, PoolState,
     MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
@@ -66,7 +66,7 @@ fn get_member_rewards() -> Result<Vec<MemberReward>, String> {
 }
 
 #[query]
-fn get_pool_rewards(input: PoolRewardsInput) -> Result<Vec<PoolReward>, String> {
+fn get_pool_rewards(input: GetPoolRewardsInput) -> Result<Vec<PoolReward>, String> {
     if in_replicated_execution() {
         return Err(
             "The method `get_pool_rewards` can only be called as non-replicated query call."
