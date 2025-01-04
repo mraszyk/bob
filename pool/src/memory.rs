@@ -1,4 +1,4 @@
-use crate::{MemberCycles, Reward, BOB_POOL_BLOCK_FEE};
+use crate::{MemberCycles, MemberReward, BOB_POOL_BLOCK_FEE};
 use candid::Principal;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager as MM, VirtualMemory};
 use ic_stable_structures::storable::Bound;
@@ -61,7 +61,7 @@ thread_local! {
         RefCell::new(StableBTreeMap::init(mm.borrow().get(MEMBER_TO_CYCLES_MEM_ID)))
     });
 
-    static MEMBER_TO_REWARDS: RefCell<StableBTreeMap<Principal, Cbor<Vec<Reward>>, VM>> =
+    static MEMBER_TO_REWARDS: RefCell<StableBTreeMap<Principal, Cbor<Vec<MemberReward>>, VM>> =
         MEMORY_MANAGER.with(|mm| {
         RefCell::new(StableBTreeMap::init(mm.borrow().get(MEMBER_TO_REWARDS_MEM_ID)))
     });
@@ -176,7 +176,7 @@ pub fn reset_member_pending_cycles(members: Vec<Principal>) {
     });
 }
 
-pub fn push_member_rewards(rewards: Vec<(Principal, Reward)>) {
+pub fn push_member_rewards(rewards: Vec<(Principal, MemberReward)>) {
     MEMBER_TO_REWARDS.with(|s| {
         for (member, reward) in rewards {
             let mut rewards = s.borrow().get(&member).unwrap();
@@ -194,7 +194,7 @@ pub fn init_member_rewards(member: Principal) {
     });
 }
 
-pub fn get_all_member_rewards() -> BTreeMap<Principal, Vec<Reward>> {
+pub fn get_all_member_rewards() -> BTreeMap<Principal, Vec<MemberReward>> {
     MEMBER_TO_REWARDS.with(|s| {
         s.borrow()
             .iter()
@@ -203,10 +203,10 @@ pub fn get_all_member_rewards() -> BTreeMap<Principal, Vec<Reward>> {
     })
 }
 
-pub fn get_member_rewards(member: Principal) -> Vec<Reward> {
+pub fn get_member_rewards(member: Principal) -> Vec<MemberReward> {
     MEMBER_TO_REWARDS.with(|s| s.borrow().get(&member).map(|r| r.0).unwrap_or_default())
 }
 
-pub fn set_member_rewards(member: Principal, rewards: Vec<Reward>) {
+pub fn set_member_rewards(member: Principal, rewards: Vec<MemberReward>) {
     MEMBER_TO_REWARDS.with(|s| s.borrow_mut().insert(member, Cbor(rewards)));
 }

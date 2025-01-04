@@ -13,7 +13,7 @@ pub use crate::memory::{
 pub use crate::rewards::{check_rewards, pay_rewards};
 pub use crate::state_machine::run;
 pub use crate::system_calls::{fetch_block, notify_top_up, transfer};
-pub use crate::types::{MemberCycles, PoolRunningState, PoolState, Reward};
+pub use crate::types::{MemberCycles, MemberReward, PoolRunningState, PoolState};
 
 mod bob_calls;
 mod guard;

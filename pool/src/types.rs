@@ -9,7 +9,7 @@ pub struct MemberCycles {
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct Reward {
+pub struct MemberReward {
     pub timestamp: u64,
     pub cycles_burnt: u128,
     pub bob_reward: u128,

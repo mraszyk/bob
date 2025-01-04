@@ -1,7 +1,8 @@
 use crate::{
     bob_transfer, get_last_reward_timestamp, get_latest_blocks, get_member_rewards,
     get_member_to_pending_cycles, push_member_rewards, reset_member_pending_cycles,
-    set_last_reward_timestamp, set_member_rewards, GuardPrincipal, Reward, TaskGuard, TaskType,
+    set_last_reward_timestamp, set_member_rewards, GuardPrincipal, MemberReward, TaskGuard,
+    TaskType,
 };
 use candid::Principal;
 use std::cmp::max;
@@ -24,7 +25,7 @@ pub async fn check_rewards() -> Result<(), String> {
         }
     }
     if total_bob_rewards > 0 {
-        let new_rewards: Vec<(Principal, Reward)> = compute_rewards(total_bob_rewards);
+        let new_rewards: Vec<(Principal, MemberReward)> = compute_rewards(total_bob_rewards);
         let members: Vec<Principal> = new_rewards
             .iter()
             .map(|(member, _)| member)
@@ -37,7 +38,7 @@ pub async fn check_rewards() -> Result<(), String> {
     Ok(())
 }
 
-fn compute_rewards(total_bob_brutto: u128) -> Vec<(Principal, Reward)> {
+fn compute_rewards(total_bob_brutto: u128) -> Vec<(Principal, MemberReward)> {
     let member_to_pending_cycles: Vec<(Principal, u128)> = get_member_to_pending_cycles();
     let total_pending_cycles: u128 = member_to_pending_cycles
         .iter()
@@ -57,7 +58,7 @@ fn compute_rewards(total_bob_brutto: u128) -> Vec<(Principal, Reward)> {
                 .unwrap();
             (
                 member,
-                Reward {
+                MemberReward {
                     timestamp: current_time,
                     cycles_burnt: pending_cycles,
                     bob_reward,

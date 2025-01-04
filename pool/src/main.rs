@@ -1,6 +1,6 @@
 use bob_pool::{
     add_member_remaining_cycles, fetch_block, init_member_rewards, notify_top_up, pay_rewards,
-    GuardPrincipal, MemberCycles, PoolState, Reward, MAINNET_CYCLE_MINTER_CANISTER_ID,
+    GuardPrincipal, MemberCycles, MemberReward, PoolState, MAINNET_CYCLE_MINTER_CANISTER_ID,
 };
 use candid::Principal;
 use ic_cdk::api::call::{accept_message, arg_data_raw_size, method_name};
@@ -59,7 +59,7 @@ fn get_member_cycles() -> Result<MemberCycles, String> {
 }
 
 #[query]
-fn get_member_rewards() -> Result<Vec<Reward>, String> {
+fn get_member_rewards() -> Result<Vec<MemberReward>, String> {
     ensure_caller_pool_member()?;
     Ok(bob_pool::get_member_rewards(ic_cdk::caller()))
 }

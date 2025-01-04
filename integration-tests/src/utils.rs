@@ -5,7 +5,7 @@ use crate::{
 };
 use bob_miner_v2::MinerSettings;
 use bob_minter_v2::{Block, Stats};
-use bob_pool::{MemberCycles, PoolRunningState, PoolState, Reward};
+use bob_pool::{MemberCycles, MemberReward, PoolRunningState, PoolState};
 use candid::{Encode, Nat, Principal};
 use ic_ledger_core::block::BlockType;
 use ic_ledger_types::{
@@ -303,8 +303,8 @@ pub(crate) fn update_miner_block_cycles(
     .unwrap();
 }
 
-pub(crate) fn get_member_rewards(pic: &PocketIc, user_id: Principal) -> Vec<Reward> {
-    query_candid_as::<_, (Result<Vec<Reward>, String>,)>(
+pub(crate) fn get_member_rewards(pic: &PocketIc, user_id: Principal) -> Vec<MemberReward> {
+    query_candid_as::<_, (Result<Vec<MemberReward>, String>,)>(
         pic,
         BOB_POOL_CANISTER_ID,
         user_id,
