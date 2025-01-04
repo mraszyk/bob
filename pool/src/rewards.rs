@@ -71,6 +71,7 @@ fn compute_rewards(total_bob_brutto: u128) -> (Vec<(Principal, MemberReward)>, P
         .collect();
     let pool_reward = PoolReward {
         timestamp: current_time,
+        num_pool_members: num_members.try_into().unwrap(),
         cycles_burnt_since_last_reward: total_pending_cycles,
         bob_reward: total_bob_brutto,
     };

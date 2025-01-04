@@ -25,6 +25,7 @@ pub struct MemberReward {
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct PoolReward {
     pub timestamp: u64,
+    pub num_pool_members: u64,
     pub cycles_burnt_since_last_reward: u128,
     pub bob_reward: u128,
 }

@@ -23,6 +23,7 @@ type MemberRewardsResult = variant {
 };
 type PoolReward = record {
   timestamp : nat64;
+  num_pool_members : nat64;
   cycles_burnt_since_last_reward : nat;
   bob_reward: nat;
 };

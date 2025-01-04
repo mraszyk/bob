@@ -447,6 +447,7 @@ fn test_pool_rewards() {
     assert_eq!(pool_rewards.len(), num_blocks);
     for i in 0..num_blocks {
         assert_eq!(pool_rewards[i].timestamp, admin_rewards[i].timestamp);
+        assert_eq!(pool_rewards[i].num_pool_members, 3);
         assert_eq!(
             pool_rewards[i].cycles_burnt_since_last_reward,
             total_block_cycles
