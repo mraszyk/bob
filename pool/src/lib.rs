@@ -26,6 +26,7 @@ mod system_calls;
 mod types;
 
 use candid::Principal;
+use ic_cdk::api::canister_balance128;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 
@@ -87,6 +88,7 @@ pub fn get_pool_state() -> PoolState {
     PoolState {
         miner: get_miner_canister(),
         running_state: get_running_state(),
+        cycles_balance: canister_balance128(),
         num_active_members,
         cycles_burnt_since_last_reward,
         total_active_member_block_cycles,

@@ -42,6 +42,7 @@ pub enum PoolRunningState {
 pub struct PoolState {
     pub miner: Option<Principal>,
     pub running_state: PoolRunningState,
+    pub cycles_balance: u128,
     pub num_active_members: u64,
     pub cycles_burnt_since_last_reward: u128,
     pub total_active_member_block_cycles: u128,

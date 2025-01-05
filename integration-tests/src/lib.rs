@@ -324,6 +324,10 @@ fn test_pool_rewards() {
     let pool_miner_extra_cycles = pool_miner_cycles - 1_000_000_000_000;
 
     let pool_state = get_pool_state(&pic);
+    assert_eq!(
+        pool_state.cycles_balance,
+        pic.cycle_balance(BOB_POOL_CANISTER_ID)
+    );
     assert_eq!(pool_state.num_active_members, 0);
     assert_eq!(pool_state.cycles_burnt_since_last_reward, 0);
     assert_eq!(pool_state.total_active_member_block_cycles, 0);
