@@ -4,6 +4,9 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+bob_miner_v2 = { path = "../miner-v2" }
+bob-minter-v2 = { path = "../minter-v2" }
+bob-pool = { path = "../pool" }
 candid = { workspace = true }
 candid_parser = { workspace = true }
 hex = { workspace = true }
@@ -13,5 +16,4 @@ ic-ledger-core = { workspace = true }
 ic-ledger-types = { workspace = true }
 icp-ledger = { workspace = true }
 icrc-ledger-types = { workspace = true }
-bob-minter-v2 = { path = "../minter-v2" }
 pocket-ic = { workspace = true }

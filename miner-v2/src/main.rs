@@ -1,5 +1,7 @@
-use bob_miner_v2::{mutate_state, process_logic, read_state, replace_state, State};
-use candid::{CandidType, Deserialize, Principal};
+use bob_miner_v2::{
+    mutate_state, process_logic, read_state, replace_state, MinerSettings, State, StatsV2,
+};
+use candid::Principal;
 use ic_cdk::{init, query, update};
 use std::time::Duration;
 
@@ -28,12 +30,6 @@ fn push_challenge(_challenge: [u8; 32], _difficulty: u64) {
     assert_eq!(ic_cdk::caller(), bob_minter_id);
 }
 
-#[derive(CandidType, Deserialize)]
-struct MinerSettings {
-    max_cycles_per_round: Option<u128>,
-    new_owner: Option<Principal>,
-}
-
 #[update]
 fn update_miner_settings(settings: MinerSettings) {
     if ic_cdk::caller() != read_state(|s| s.owner) {
@@ -48,14 +44,6 @@ fn update_miner_settings(settings: MinerSettings) {
             s.owner = new_owner;
         }
     })
-}
-
-#[derive(CandidType)]
-struct StatsV2 {
-    cycle_balance: u64,
-    cycles_burned_per_round: u128,
-    round_length_secs: u64,
-    last_round_cyles_burned: u128,
 }
 
 #[query]

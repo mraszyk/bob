@@ -4,5 +4,8 @@
   },
   "miner": {
     "ic": "mr6ee-jaaaa-aaaas-aaciq-cai"
+  },
+  "bob-pool": {
+    "ic": "eclma-2yaaa-aaaas-al3bq-cai"
   }
 }

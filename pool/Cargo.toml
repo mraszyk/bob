@@ -1,0 +1,32 @@
+[package]
+name = "bob-pool"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+bob_miner_v2 = { path = "../miner-v2" }
+bob-minter-v2 = { path = "../minter-v2" }
+candid = { workspace = true }
+candid_parser = { workspace = true }
+ciborium = { workspace = true }
+cycles-minting-canister = { workspace = true }
+ic-base-types = { workspace = true }
+ic-cdk = { workspace = true }
+ic-cdk-timers = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic0 = { workspace = true }
+ic-management-canister-types = { workspace = true }
+ic-ledger-types = { workspace = true }
+icrc-ledger-client-cdk = { workspace = true }
+ic-types = { workspace = true }
+icrc-ledger-types = { workspace = true }
+ic-ledger-core = { workspace = true }
+icp-ledger = { workspace = true }
+ic-icp-index = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+scopeguard = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }

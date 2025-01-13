@@ -14,6 +14,11 @@
       "shrink": true,
       "gzip": true,
       "type": "rust"
+    },
+    "bob-pool": {
+      "candid": "pool/pool.did",
+      "type": "custom",
+      "wasm": "target/wasm32-unknown-unknown/release/bob-pool.wasm.gz"
     }
   },
   "defaults": {
